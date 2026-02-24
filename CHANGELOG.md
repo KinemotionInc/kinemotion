@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## kinemotion-v0.81.1 (2026-02-24)
+
+### Fix
+
+- **sonar**: use lowercase organization key for SonarCloud
+- **sonar**: bump project version for new org alignment
+
 ## kinemotion-v0.81.0 (2026-02-12)
 
 ### Feat
