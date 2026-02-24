@@ -347,4 +347,4 @@ ______________________________________________________________________
 
 - **Google Cloud Documentation**: https://cloud.google.com/run/docs
 - **Cloud Run FAQ**: https://cloud.google.com/run/docs/faq
-- **Kinemotion Issues**: https://github.com/feniix/kinemotion/issues
+- **Kinemotion Issues**: https://github.com/KinemotionInc/kinemotion/issues

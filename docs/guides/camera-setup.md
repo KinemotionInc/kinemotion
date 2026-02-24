@@ -941,7 +941,7 @@ ______________________________________________________________________
 - **[Pose Systems Quick Reference](../reference/pose-systems.md)** - System comparison guide
 - [CLI Parameters Guide](../reference/parameters.md) - Analysis parameters
 - [CMJ Guide](cmj-guide.md) - Counter-movement jump specifics
-- [CLAUDE.md](https://github.com/feniix/kinemotion/blob/main/CLAUDE.md) - Complete project documentation (GitHub)
+- [CLAUDE.md](https://github.com/KinemotionInc/kinemotion/blob/main/CLAUDE.md) - Complete project documentation (GitHub)
 
 ______________________________________________________________________
 

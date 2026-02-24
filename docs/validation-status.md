@@ -407,7 +407,7 @@ ______________________________________________________________________
 **Proper citation:**
 
 ```text
-Kinemotion (version X.X.X) [Software]. (2025). Retrieved from https://github.com/feniix/kinemotion
+Kinemotion (version X.X.X) [Software]. (2025). Retrieved from https://github.com/KinemotionInc/kinemotion
 
 Note: Kinemotion is experimental software not validated against force plates.
 Measurements should be interpreted with caution.
@@ -421,7 +421,7 @@ ______________________________________________________________________
 
 If you discover accuracy issues or unexpected behavior:
 
-- Open an issue: <https://github.com/feniix/kinemotion/issues>
+- Open an issue: <https://github.com/KinemotionInc/kinemotion/issues>
 - Include video specifications, detection results, expected vs actual
 
 ### Contribute to Validation

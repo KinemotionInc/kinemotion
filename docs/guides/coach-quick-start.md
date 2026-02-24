@@ -377,7 +377,7 @@ ______________________________________________________________________
 
 **Questions or feedback?** Email us at support@kinemotion.dev
 
-**Found a bug?** Report it at github.com/feniix/kinemotion/issues
+**Found a bug?** Report it at github.com/KinemotionInc/kinemotion/issues
 
 ______________________________________________________________________
 

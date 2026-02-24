@@ -13,7 +13,7 @@ Complete setup guide for the Kinemotion FastAPI backend.
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/feniix/kinemotion.git
+git clone https://github.com/KinemotionInc/kinemotion.git
 cd kinemotion
 ```
 
