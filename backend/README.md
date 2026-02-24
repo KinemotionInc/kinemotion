@@ -543,4 +543,4 @@ For issues:
 - Check the troubleshooting section above
 - Review error messages and processing_time_s
 - Enable verbose mode in kinemotion for debugging
-- Open issue on GitHub: https://github.com/feniix/kinemotion/issues
+- Open issue on GitHub: https://github.com/KinemotionInc/kinemotion/issues

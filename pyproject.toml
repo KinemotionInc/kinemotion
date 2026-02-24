@@ -32,10 +32,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/feniix/kinemotion"
-Repository = "https://github.com/feniix/kinemotion"
-Source = "https://github.com/feniix/kinemotion"
-Issues = "https://github.com/feniix/kinemotion/issues"
+Homepage = "https://github.com/KinemotionInc/kinemotion"
+Repository = "https://github.com/KinemotionInc/kinemotion"
+Source = "https://github.com/KinemotionInc/kinemotion"
+Issues = "https://github.com/KinemotionInc/kinemotion/issues"
 
 [project.scripts]
 kinemotion = "kinemotion.cli:cli"

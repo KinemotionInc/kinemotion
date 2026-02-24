@@ -4,7 +4,7 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/kinemotion.svg)](https://pypi.org/project/kinemotion/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[![Tests](https://github.com/feniix/kinemotion/workflows/Test%20%26%20Quality/badge.svg)](https://github.com/feniix/kinemotion/actions)
+[![Tests](https://github.com/KinemotionInc/kinemotion/workflows/Test%20%26%20Quality/badge.svg)](https://github.com/KinemotionInc/kinemotion/actions)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=feniix_kinemotion&metric=alert_status)](https://sonarcloud.io/summary/overall?id=feniix_kinemotion)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=feniix_kinemotion&metric=coverage)](https://sonarcloud.io/summary/overall?id=feniix_kinemotion)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11506/badge)](https://www.bestpractices.dev/projects/11506)

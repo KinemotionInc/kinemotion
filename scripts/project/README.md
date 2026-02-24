@@ -142,6 +142,6 @@ Set multiple fields on an issue at once.
 ## Notes
 
 - Project ID is hardcoded as: `PVT_kwHOAAFl8c4BJKHO`
-- Repository is: `feniix/kinemotion`
+- Repository is: `KinemotionInc/kinemotion`
 - These scripts use the GitHub GraphQL API via `gh api graphql`
 - Requires `gh` CLI with proper authentication (including `project` scope)

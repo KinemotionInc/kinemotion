@@ -68,7 +68,7 @@ The project integrates with SonarQube Cloud for continuous code quality and cove
 Setup (one-time):
 
 1. Visit [SonarCloud](https://sonarcloud.io/) and sign in with GitHub
-2. Import the `feniix/kinemotion` repository
+2. Import the `KinemotionInc/kinemotion` repository
 3. Generate a token: My Account > Security > Generate Tokens
 4. Add token to GitHub: Repository > Settings > Secrets and variables > Actions
    - Name: `SONAR_TOKEN`

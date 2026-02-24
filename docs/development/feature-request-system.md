@@ -23,7 +23,7 @@ export const EXTERNAL_LINKS = {
   FEATURE_REQUEST: 'https://docs.google.com/forms/d/e/YOUR_FORM_ID/viewform',
 
   // Other links...
-  GITHUB_ISSUES: 'https://github.com/feniix/kinemotion/issues',
+  GITHUB_ISSUES: 'https://github.com/KinemotionInc/kinemotion/issues',
   // ...
 }
 ```

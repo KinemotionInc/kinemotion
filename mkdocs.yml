@@ -2,8 +2,8 @@ site_name: Kinemotion
 site_description: Video-based kinematic analysis for athletic performance
 site_author: Sebastian Otaegui
 site_url: https://kinemotion.readthedocs.io
-repo_url: https://github.com/feniix/kinemotion
-repo_name: feniix/kinemotion
+repo_url: https://github.com/KinemotionInc/kinemotion
+repo_name: KinemotionInc/kinemotion
 edit_uri: edit/main/docs/
 
 theme:

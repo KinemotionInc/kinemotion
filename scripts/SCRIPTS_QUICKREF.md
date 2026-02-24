@@ -195,7 +195,7 @@ Create a new issue and add it to the project with custom fields.
 
 - All scripts use the `gh` CLI with GraphQL API
 - Project ID: `PVT_kwHOAAFl8c4BJKHO`
-- Repository: `feniix/kinemotion`
+- Repository: `KinemotionInc/kinemotion`
 - Requires `gh` authentication with `project` scope
 - Scripts handle errors gracefully and provide clear feedback
 - Helper functions in `scripts/project/helpers.sh` can be sourced for custom scripts

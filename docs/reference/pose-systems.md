@@ -323,7 +323,7 @@ For kinemotion project-specific questions, see:
 
 - Detailed comparison: [`docs/research/pose-estimator-comparison-2025.md`](../research/pose-estimator-comparison-2025.md)
 - Sports biomechanics research: [`docs/research/sports-biomechanics-pose-estimation.md`](../research/sports-biomechanics-pose-estimation.md)
-- Project: <https://github.com/feniix/kinemotion>
+- Project: <https://github.com/KinemotionInc/kinemotion>
 
 **Check for updates:** Research landscape changes quickly. New validations and systems emerge regularly.
 

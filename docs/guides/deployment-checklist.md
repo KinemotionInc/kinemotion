@@ -334,7 +334,7 @@ ______________________________________________________________________
 
 - **Google Cloud Docs**: https://cloud.google.com/run/docs
 - **Vercel Docs**: https://vercel.com/docs
-- **Project GitHub**: https://github.com/feniix/kinemotion
+- **Project GitHub**: https://github.com/KinemotionInc/kinemotion
 
 ______________________________________________________________________
 
