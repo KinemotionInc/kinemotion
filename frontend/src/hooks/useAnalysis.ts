@@ -58,6 +58,12 @@ async function getAuthToken(): Promise<string | undefined> {
  * Upload a file directly to R2 via presigned PUT URL with progress tracking.
  * Returns a promise that resolves when the upload completes.
  */
+const R2_UPLOAD_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
+
+/**
+ * Upload a file directly to R2 via presigned PUT URL with progress tracking.
+ * Returns a promise that resolves when the upload completes.
+ */
 function uploadToR2(
   uploadUrl: string,
   file: File,
@@ -66,6 +72,7 @@ function uploadToR2(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
+    xhr.timeout = R2_UPLOAD_TIMEOUT_MS
 
     xhr.upload.addEventListener('progress', (event) => {
       if (event.lengthComputable) {
@@ -88,6 +95,10 @@ function uploadToR2(
 
     xhr.addEventListener('abort', () => {
       reject(new Error('Upload was cancelled'))
+    })
+
+    xhr.addEventListener('timeout', () => {
+      reject(new Error('Upload timed out. Please check your connection and try again.'))
     })
 
     xhr.open('PUT', uploadUrl)
@@ -169,6 +180,13 @@ export function useAnalysis(): UseAnalysisState & UseAnalysisActions {
       setUploadProgress(90)
 
       // --- Step 3: Trigger analysis with video_key ---
+      // Re-fetch token in case upload was slow and original token expired
+      const freshToken = await getAuthToken()
+      const analyzeHeaders: Record<string, string> = {}
+      if (freshToken) {
+        analyzeHeaders['Authorization'] = `Bearer ${freshToken}`
+      }
+
       const analyzeForm = new FormData()
       analyzeForm.append('video_key', presign.object_key)
       const backendJumpType = jumpType === 'dropjump' ? 'drop_jump' : jumpType
@@ -180,7 +198,7 @@ export function useAnalysis(): UseAnalysisState & UseAnalysisActions {
 
       const analyzeRes = await fetch(getApiUrl('/api/analyze'), {
         method: 'POST',
-        headers,
+        headers: analyzeHeaders,
         body: analyzeForm,
       })
 

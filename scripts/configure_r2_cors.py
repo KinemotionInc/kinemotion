@@ -1,5 +1,9 @@
 """Configure CORS on the R2 bucket for direct browser uploads.
 
+WARNING: This script includes localhost origins and is intended for
+development / staging environments. For production, remove the localhost
+origins or use the Cloudflare Dashboard to set a production-only policy.
+
 This script sets the CORS policy on the Kinemotion R2 bucket so that
 the frontend can PUT video files directly via presigned URLs.
 

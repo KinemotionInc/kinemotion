@@ -5,6 +5,9 @@ import structlog
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
+# Default expiration for presigned upload URLs (15 minutes)
+PRESIGN_UPLOAD_EXPIRATION_S = 900
+
 
 class R2StorageClient:
     """Cloudflare R2 storage client for video and results management."""
@@ -73,7 +76,7 @@ class R2StorageClient:
         return self.generate_presigned_url(normalized_key, expiration=self.presign_expiration_s)
 
     def generate_presigned_upload_url(
-        self, key: str, content_type: str, expiration: int = 900
+        self, key: str, content_type: str, expiration: int = PRESIGN_UPLOAD_EXPIRATION_S
     ) -> str:
         """Generate a presigned URL for uploading (PUT) an object directly to R2.
 

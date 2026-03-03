@@ -110,28 +110,20 @@ describe('useAnalysis Hook', () => {
       metrics: { data: { jump_height_m: 0.5 } },
     };
 
-    // Mock fetch for step 1 (presign) and step 3 (analyze)
-    let fetchCallCount = 0;
-    const mockFetch = vi.fn().mockImplementation(() => {
-      fetchCallCount++;
-      if (fetchCallCount === 1) {
-        // Step 1: presign response
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({
-            upload_url: 'https://r2.example.com/presigned-put',
-            object_key: 'videos/uploads/test.mp4',
-            expires_in: 900,
-          }),
-        });
-      } else {
-        // Step 3: analyze response
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockAnalysisResponse),
-        });
-      }
-    });
+    // Mock fetch: step 1 (presign) then step 3 (analyze)
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          upload_url: 'https://r2.example.com/presigned-put',
+          object_key: 'videos/uploads/test.mp4',
+          expires_in: 900,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockAnalysisResponse),
+      });
     vi.stubGlobal('fetch', mockFetch);
 
     // Mock XHR for step 2 (R2 upload) — auto-resolve on send
@@ -243,6 +235,60 @@ describe('useAnalysis Hook', () => {
     });
 
     expect(result.current.error).toBe('Network error: Unable to upload video');
+  });
+
+  it('should handle analysis API error after successful upload', async () => {
+    // Step 1 (presign) succeeds
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          upload_url: 'https://r2.example.com/presigned-put',
+          object_key: 'videos/uploads/test.mp4',
+          expires_in: 900,
+        }),
+      })
+      // Step 3 (analyze) fails
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ message: 'Video processing failed' }),
+      });
+    vi.stubGlobal('fetch', mockFetch);
+
+    // Step 2 (R2 upload) succeeds
+    const xhrEventListeners: Record<string, EventListener> = {};
+    mockXHR.addEventListener.mockImplementation((event: string, cb: EventListener) => {
+      xhrEventListeners[event] = cb;
+    });
+    mockXHR.send.mockImplementation(() => {
+      mockXHR.status = 200;
+      setTimeout(() => {
+        if (xhrEventListeners['load']) {
+          xhrEventListeners['load']({} as Event);
+        }
+      }, 0);
+    });
+
+    const { result } = renderHook(() => useAnalysis());
+    const file = new File(['dummy content'], 'test.mp4', { type: 'video/mp4' });
+
+    act(() => {
+      result.current.setFile(file);
+    });
+
+    await act(async () => {
+      await result.current.analyze();
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.error).toBe('Video processing failed');
+    expect(result.current.metrics).toBeNull();
+    // Verify both fetch calls were made (upload succeeded, analysis failed)
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
   it('should reset state', () => {

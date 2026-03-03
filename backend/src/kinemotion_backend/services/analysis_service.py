@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import time
+import uuid
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
@@ -212,8 +213,9 @@ class AnalysisService:
 
         with _temp_file_context() as paths:
             try:
-                # Download video from R2 to temp file
-                temp_path = self.storage_service.get_temp_file_path(Path(video_key).name)
+                # Download video from R2 to temp file (UUID prefix prevents collisions)
+                unique_name = f"{uuid.uuid4().hex[:8]}_{Path(video_key).name}"
+                temp_path = self.storage_service.get_temp_file_path(unique_name)
                 paths["temp_path"] = temp_path
 
                 logger.info("downloading_video_from_r2", video_key=video_key)
@@ -510,6 +512,7 @@ class AnalysisService:
             "video_analysis_completed",
             jump_type=normalized_jump_type,
             duration_ms=round(processing_time * 1000, 1),
+            metrics_count=len(metrics.get("data", {})),
             upload_mode=upload_mode,
         )
         return response

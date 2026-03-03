@@ -20,6 +20,7 @@ from ..app.dependencies import get_analysis_service, get_storage_service
 from ..auth import SupabaseAuth
 from ..logging_config import get_logger
 from ..models.responses import AnalysisResponse
+from ..models.storage import PRESIGN_UPLOAD_EXPIRATION_S
 from ..services import is_test_password_valid, validate_demographics, validate_referer
 from ..services.analysis_service import AnalysisService
 from ..services.storage_service import StorageService
@@ -88,6 +89,11 @@ async def presign_upload(
     Returns a presigned PUT URL so the browser can upload the video
     directly to R2, bypassing Cloud Run's 32 MiB request body limit.
 
+    Note: R2/S3 presigned URLs do not support ``Content-Length-Range``
+    conditions, so the 200 MB limit is enforced client-side only.
+    The ``analyze_from_r2_key`` service validates a 500 MB hard cap
+    after download.
+
     Args:
         request: HTTP request
         filename: Original filename of the video
@@ -124,7 +130,7 @@ async def presign_upload(
         content={
             "upload_url": upload_url,
             "object_key": video_key,
-            "expires_in": 900,
+            "expires_in": PRESIGN_UPLOAD_EXPIRATION_S,
         }
     )
 
