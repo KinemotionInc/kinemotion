@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 from ..logging_config import get_logger
 from ..models.responses import AnalysisResponse, MetricsData
+from ..models.storage import VIDEO_KEY_PREFIX
 from .interpretation_service import interpret_metrics
 from .storage_service import StorageService
 from .validation import validate_jump_type, validate_video_file
@@ -259,7 +260,7 @@ class AnalysisService:
                 # Upload results and debug video (skip original — already in R2)
                 # Strip "videos/" prefix so upload helpers produce correct keys
                 # (helpers prepend "results/" / "debug_videos/")
-                storage_key = video_key.removeprefix("videos/")
+                storage_key = video_key.removeprefix(VIDEO_KEY_PREFIX)
                 results_url = await self._upload_results(metrics, storage_key)
                 debug_video_url = await self._upload_debug_video(
                     temp_debug_video_path, storage_key

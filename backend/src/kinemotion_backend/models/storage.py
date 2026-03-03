@@ -8,6 +8,9 @@ logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 # Default expiration for presigned upload URLs (15 minutes)
 PRESIGN_UPLOAD_EXPIRATION_S = 900
 
+# Prefix for video objects in R2 (e.g. "videos/uploads/user/…/uuid.mp4")
+VIDEO_KEY_PREFIX = "videos/"
+
 
 class R2StorageClient:
     """Cloudflare R2 storage client for video and results management."""

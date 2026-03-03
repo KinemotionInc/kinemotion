@@ -160,7 +160,7 @@ export function useAnalysis(): UseAnalysisState & UseAnalysisActions {
       if (!presignRes.ok) {
         const errBody = await presignRes.json().catch(() => null)
         throw new Error(
-          errBody?.detail || errBody?.message || `Failed to get upload URL: ${presignRes.status}`,
+          errBody?.error || errBody?.message || errBody?.detail || `Failed to get upload URL: ${presignRes.status}`,
         )
       }
 

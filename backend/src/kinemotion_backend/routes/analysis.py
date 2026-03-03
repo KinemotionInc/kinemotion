@@ -20,7 +20,7 @@ from ..app.dependencies import get_analysis_service, get_storage_service
 from ..auth import SupabaseAuth
 from ..logging_config import get_logger
 from ..models.responses import AnalysisResponse
-from ..models.storage import PRESIGN_UPLOAD_EXPIRATION_S
+from ..models.storage import PRESIGN_UPLOAD_EXPIRATION_S, VIDEO_KEY_PREFIX
 from ..services import is_test_password_valid, validate_demographics, validate_referer
 from ..services.analysis_service import AnalysisService
 from ..services.storage_service import StorageService
@@ -111,7 +111,7 @@ async def presign_upload(
         )
 
     object_key = await storage_service.generate_unique_key(filename, email)
-    video_key = f"videos/{object_key}"
+    video_key = f"{VIDEO_KEY_PREFIX}{object_key}"
 
     upload_url = storage_service.client.generate_presigned_upload_url(
         key=video_key,
@@ -202,10 +202,9 @@ async def analyze_video(
         )
 
     # Validate video_key ownership before entering the processing try-block
-    if has_key:
-        assert video_key is not None
+    if has_key and video_key is not None:
         sanitized_key = video_key.strip()
-        expected_prefix = f"videos/uploads/{email}/"
+        expected_prefix = f"{VIDEO_KEY_PREFIX}uploads/{email}/"
         if not sanitized_key.startswith(expected_prefix):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -232,8 +231,7 @@ async def analyze_video(
             upload_mode="r2_key" if has_key else "file_upload",
         )
 
-        if has_key:
-            assert video_key is not None
+        if has_key and video_key is not None:
             result: AnalysisResponse = await analysis_service.analyze_from_r2_key(
                 video_key=video_key.strip(),
                 jump_type=jump_type,
@@ -243,8 +241,7 @@ async def analyze_video(
                 age=age,
                 training_level=normalized_training_level,
             )
-        else:
-            assert file is not None
+        elif file is not None:
             result = await analysis_service.analyze_video(
                 file=file,
                 jump_type=jump_type,
@@ -254,6 +251,12 @@ async def analyze_video(
                 sex=normalized_sex,
                 age=age,
                 training_level=normalized_training_level,
+            )
+        else:
+            # Unreachable: earlier validation ensures file or video_key is set
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Provide either 'file' or 'video_key'.",
             )
 
         # Log analysis completion
