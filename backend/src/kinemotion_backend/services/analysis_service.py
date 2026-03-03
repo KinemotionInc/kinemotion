@@ -229,7 +229,7 @@ class AnalysisService:
                 # Validate file size
                 file_size = Path(temp_path).stat().st_size
                 if file_size > 500 * 1024 * 1024:
-                    raise ValueError("File size exceeds maximum of 500MB")
+                    raise ValueError(f"File size exceeds maximum of 500MB (key={video_key})")
 
                 # Create debug video temp path if needed
                 temp_debug_video_path: str | None = None
@@ -257,8 +257,13 @@ class AnalysisService:
                 self._log_stage_metrics(timer.get_metrics())
 
                 # Upload results and debug video (skip original — already in R2)
-                results_url = await self._upload_results(metrics, video_key)
-                debug_video_url = await self._upload_debug_video(temp_debug_video_path, video_key)
+                # Strip "videos/" prefix so upload helpers produce correct keys
+                # (helpers prepend "results/" / "debug_videos/")
+                storage_key = video_key.removeprefix("videos/")
+                results_url = await self._upload_results(metrics, storage_key)
+                debug_video_url = await self._upload_debug_video(
+                    temp_debug_video_path, storage_key
+                )
                 original_video_url = self.storage_service.client.get_object_url(video_key)
 
                 return self._enrich_and_build_response(
@@ -282,6 +287,7 @@ class AnalysisService:
                 logger.error(
                     "video_analysis_from_r2_key_failed",
                     video_key=video_key,
+                    jump_type=jump_type,
                     error=str(e),
                     error_type=type(e).__name__,
                     processing_time_s=round(processing_time, 2),

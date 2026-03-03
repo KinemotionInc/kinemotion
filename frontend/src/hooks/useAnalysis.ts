@@ -54,10 +54,6 @@ async function getAuthToken(): Promise<string | undefined> {
   return session?.access_token
 }
 
-/**
- * Upload a file directly to R2 via presigned PUT URL with progress tracking.
- * Returns a promise that resolves when the upload completes.
- */
 const R2_UPLOAD_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
 
 /**

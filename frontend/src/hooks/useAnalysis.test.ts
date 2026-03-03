@@ -28,6 +28,7 @@ describe('useAnalysis Hook', () => {
       addEventListener: vi.fn(),
       status: 200,
       responseText: '',
+      timeout: 0,
     };
 
     class MockXMLHttpRequest {
@@ -40,6 +41,8 @@ describe('useAnalysis Hook', () => {
       set status(v) { mockXHR.status = v; }
       get responseText() { return mockXHR.responseText; }
       set responseText(v) { mockXHR.responseText = v; }
+      get timeout() { return mockXHR.timeout; }
+      set timeout(v) { mockXHR.timeout = v; }
     }
 
     vi.stubGlobal('XMLHttpRequest', MockXMLHttpRequest);
@@ -168,6 +171,7 @@ describe('useAnalysis Hook', () => {
 
     // Verify XHR was used for R2 upload
     expect(mockXHR.open).toHaveBeenCalledWith('PUT', 'https://r2.example.com/presigned-put');
+    expect(mockXHR.setRequestHeader).toHaveBeenCalledWith('Content-Type', 'video/mp4');
   });
 
   it('should handle presign API error', async () => {
@@ -289,6 +293,50 @@ describe('useAnalysis Hook', () => {
     expect(result.current.metrics).toBeNull();
     // Verify both fetch calls were made (upload succeeded, analysis failed)
     expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('should handle R2 upload timeout', async () => {
+    // Step 1 (presign) succeeds
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        upload_url: 'https://r2.example.com/presigned-put',
+        object_key: 'videos/test.mp4',
+        expires_in: 900,
+      }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    // Step 2 (R2 upload) times out
+    const xhrEventListeners: Record<string, EventListener> = {};
+    mockXHR.addEventListener.mockImplementation((event: string, cb: EventListener) => {
+      xhrEventListeners[event] = cb;
+    });
+    mockXHR.send.mockImplementation(() => {
+      setTimeout(() => {
+        if (xhrEventListeners['timeout']) {
+          xhrEventListeners['timeout']({} as Event);
+        }
+      }, 0);
+    });
+
+    const { result } = renderHook(() => useAnalysis());
+    const file = new File(['dummy content'], 'test.mp4', { type: 'video/mp4' });
+
+    act(() => {
+      result.current.setFile(file);
+    });
+
+    await act(async () => {
+      await result.current.analyze();
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.error).toBe('Upload timed out. Please check your connection and try again.');
+    expect(mockXHR.timeout).toBe(5 * 60 * 1000);
   });
 
   it('should reset state', () => {
