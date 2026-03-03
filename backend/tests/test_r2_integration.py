@@ -529,6 +529,105 @@ def test_endpoint_handles_r2_results_upload_failure(
         assert "metrics" in data
 
 
+def test_generate_presigned_upload_url_success() -> None:
+    """Test successful presigned upload URL generation."""
+    with patch.dict(
+        "os.environ",
+        {
+            "R2_ENDPOINT": "https://r2.example.com",
+            "R2_ACCESS_KEY": "test_key",
+            "R2_SECRET_KEY": "test_secret",
+        },
+    ):
+        with patch("kinemotion_backend.models.storage.boto3.client") as mock_boto3:
+            mock_s3 = MagicMock()
+            mock_boto3.return_value = mock_s3
+            mock_s3.generate_presigned_url.return_value = (
+                "https://r2.example.com/presigned-put-url"
+            )
+
+            client = R2StorageClient()
+            url = client.generate_presigned_upload_url("videos/uploads/test.mp4", "video/mp4")
+
+            mock_s3.generate_presigned_url.assert_called_once_with(
+                "put_object",
+                Params={
+                    "Bucket": "test-bucket",
+                    "Key": "videos/uploads/test.mp4",
+                    "ContentType": "video/mp4",
+                },
+                ExpiresIn=900,
+            )
+            assert url == "https://r2.example.com/presigned-put-url"
+
+
+def test_generate_presigned_upload_url_custom_expiration() -> None:
+    """Test presigned upload URL with custom expiration."""
+    with patch.dict(
+        "os.environ",
+        {
+            "R2_ENDPOINT": "https://r2.example.com",
+            "R2_ACCESS_KEY": "test_key",
+            "R2_SECRET_KEY": "test_secret",
+        },
+    ):
+        with patch("kinemotion_backend.models.storage.boto3.client") as mock_boto3:
+            mock_s3 = MagicMock()
+            mock_boto3.return_value = mock_s3
+            mock_s3.generate_presigned_url.return_value = "https://r2.example.com/url"
+
+            client = R2StorageClient()
+            client.generate_presigned_upload_url("videos/test.mp4", "video/mp4", expiration=1800)
+
+            call_kwargs = mock_s3.generate_presigned_url.call_args
+            assert call_kwargs[1]["ExpiresIn"] == 1800
+
+
+def test_generate_presigned_upload_url_content_type() -> None:
+    """Test presigned upload URL passes content type correctly."""
+    with patch.dict(
+        "os.environ",
+        {
+            "R2_ENDPOINT": "https://r2.example.com",
+            "R2_ACCESS_KEY": "test_key",
+            "R2_SECRET_KEY": "test_secret",
+        },
+    ):
+        with patch("kinemotion_backend.models.storage.boto3.client") as mock_boto3:
+            mock_s3 = MagicMock()
+            mock_boto3.return_value = mock_s3
+            mock_s3.generate_presigned_url.return_value = "https://r2.example.com/url"
+
+            client = R2StorageClient()
+            client.generate_presigned_upload_url("videos/test.mov", "video/quicktime")
+
+            call_kwargs = mock_s3.generate_presigned_url.call_args
+            assert call_kwargs[1]["Params"]["ContentType"] == "video/quicktime"
+
+
+def test_generate_presigned_upload_url_error_handling() -> None:
+    """Test presigned upload URL error handling."""
+    with patch.dict(
+        "os.environ",
+        {
+            "R2_ENDPOINT": "https://r2.example.com",
+            "R2_ACCESS_KEY": "test_key",
+            "R2_SECRET_KEY": "test_secret",
+        },
+    ):
+        with patch("kinemotion_backend.models.storage.boto3.client") as mock_boto3:
+            mock_s3 = MagicMock()
+            mock_s3.generate_presigned_url.side_effect = Exception("Presign failed")
+            mock_boto3.return_value = mock_s3
+
+            client = R2StorageClient()
+
+            with pytest.raises(IOError) as exc_info:
+                client.generate_presigned_upload_url("videos/test.mp4", "video/mp4")
+
+            assert "Failed to generate presigned upload URL" in str(exc_info.value)
+
+
 def test_r2_bucket_name_from_env() -> None:
     """Test that R2 bucket name is read from environment."""
     with patch.dict(

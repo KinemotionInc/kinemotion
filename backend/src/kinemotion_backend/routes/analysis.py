@@ -16,12 +16,13 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse
 
-from ..app.dependencies import get_analysis_service
+from ..app.dependencies import get_analysis_service, get_storage_service
 from ..auth import SupabaseAuth
 from ..logging_config import get_logger
 from ..models.responses import AnalysisResponse
 from ..services import is_test_password_valid, validate_demographics, validate_referer
 from ..services.analysis_service import AnalysisService
+from ..services.storage_service import StorageService
 from ..utils import limit
 
 logger = get_logger(__name__)
@@ -73,6 +74,61 @@ async def get_user_email_for_analysis(
         ) from e
 
 
+@router.post("/upload/presign")
+@limit("5/minute")
+async def presign_upload(
+    request: Request,
+    filename: str = Form(...),  # noqa: B008
+    content_type: str = Form(...),  # noqa: B008
+    email: str = Depends(get_user_email_for_analysis),  # noqa: B008
+    storage_service: StorageService = Depends(get_storage_service),  # noqa: B008
+) -> JSONResponse:
+    """Generate a presigned URL for direct-to-R2 video upload.
+
+    Returns a presigned PUT URL so the browser can upload the video
+    directly to R2, bypassing Cloud Run's 32 MiB request body limit.
+
+    Args:
+        request: HTTP request
+        filename: Original filename of the video
+        content_type: MIME type (must start with ``video/``)
+        email: Authenticated user email
+        storage_service: Injected storage service
+
+    Returns:
+        JSON with upload_url, object_key, and expires_in
+    """
+    if not content_type.startswith("video/"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid content type: {content_type}. Must be a video/* MIME type.",
+        )
+
+    object_key = await storage_service.generate_unique_key(filename, email)
+    video_key = f"videos/{object_key}"
+
+    upload_url = storage_service.client.generate_presigned_upload_url(
+        key=video_key,
+        content_type=content_type,
+    )
+
+    logger.info(
+        "presigned_upload_url_generated",
+        filename=filename,
+        content_type=content_type,
+        object_key=video_key,
+        email=email,
+    )
+
+    return JSONResponse(
+        content={
+            "upload_url": upload_url,
+            "object_key": video_key,
+            "expires_in": 900,
+        }
+    )
+
+
 @router.post(
     "/analyze",
     response_model=AnalysisResponse,
@@ -84,7 +140,8 @@ async def get_user_email_for_analysis(
 @limit("3/minute")
 async def analyze_video(
     request: Request,
-    file: UploadFile = File(...),  # noqa: B008
+    file: UploadFile | None = File(None),  # noqa: B008
+    video_key: str | None = Form(None),  # noqa: B008
     jump_type: str = Form("cmj"),  # noqa: B008
     quality: str = Form("balanced"),  # noqa: B008
     debug: str = Form("false"),  # noqa: B008
@@ -98,16 +155,12 @@ async def analyze_video(
 ) -> JSONResponse:
     """Analyze video and return jump metrics.
 
-    This endpoint processes a video file using real kinemotion analysis:
-    - Drop Jump: Analyzes ground contact and flight time
-    - CMJ: Analyzes jump height, countermovement depth, and phases
-    - Squat Jump: Analyzes jump height from static squat position
-
-    Requires authentication via JWT token in Authorization header, or TEST_PASSWORD
-    header for testing/debugging.
+    Accepts either a file upload or a video_key referencing a video already in R2
+    (uploaded via the presign flow). Exactly one must be provided.
 
     Args:
         file: Video file to analyze (multipart/form-data)
+        video_key: R2 object key of a previously uploaded video
         jump_type: Type of jump ("cmj", "drop_jump", or "sj"; "squat_jump" accepted as alias)
         quality: Analysis quality preset ("fast", "balanced", or "accurate")
         debug: Debug overlay flag ("true" or "false", default "false")
@@ -127,6 +180,21 @@ async def analyze_video(
     # Validate referer (prevent direct API access)
     validate_referer(referer, x_test_password)
 
+    # Determine upload mode: file upload vs R2 key
+    has_file = file is not None and file.filename
+    has_key = video_key is not None and video_key.strip()
+
+    if has_file and has_key:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Provide either 'file' or 'video_key', not both.",
+        )
+    if not has_file and not has_key:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Provide either 'file' (upload) or 'video_key' (presigned upload).",
+        )
+
     try:
         # Convert debug string to boolean
         enable_debug = debug.lower() == "true"
@@ -144,19 +212,33 @@ async def analyze_video(
             sex=normalized_sex,
             age=age,
             training_level=normalized_training_level,
+            upload_mode="r2_key" if has_key else "file_upload",
         )
 
-        # Perform analysis using service layer
-        result: AnalysisResponse = await analysis_service.analyze_video(
-            file=file,
-            jump_type=jump_type,
-            quality=quality,
-            debug=enable_debug,
-            user_id=email,
-            sex=normalized_sex,
-            age=age,
-            training_level=normalized_training_level,
-        )
+        if has_key:
+            assert video_key is not None
+            result: AnalysisResponse = await analysis_service.analyze_from_r2_key(
+                video_key=video_key.strip(),
+                jump_type=jump_type,
+                quality=quality,
+                debug=enable_debug,
+                user_id=email,
+                sex=normalized_sex,
+                age=age,
+                training_level=normalized_training_level,
+            )
+        else:
+            assert file is not None
+            result = await analysis_service.analyze_video(
+                file=file,
+                jump_type=jump_type,
+                quality=quality,
+                debug=enable_debug,
+                user_id=email,
+                sex=normalized_sex,
+                age=age,
+                training_level=normalized_training_level,
+            )
 
         # Log analysis completion
         analysis_duration = time.perf_counter() - start_time
