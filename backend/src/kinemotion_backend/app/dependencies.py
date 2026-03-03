@@ -6,6 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from ..auth import SupabaseAuth
 from ..logging_config import get_logger
 from ..services.analysis_service import AnalysisService
+from ..services.storage_service import StorageService
 
 logger = get_logger(__name__)
 security = HTTPBearer()
@@ -74,3 +75,8 @@ def get_analysis_service() -> AnalysisService:
         and holds no expensive connections.
     """
     return AnalysisService()
+
+
+def get_storage_service() -> StorageService:
+    """Get StorageService instance for dependency injection."""
+    return StorageService()

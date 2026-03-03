@@ -17,7 +17,7 @@ describe('useAnalysis Hook', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // 1. Create the spies object
+    // Mock XMLHttpRequest for R2 upload (step 2)
     mockXHR = {
       open: vi.fn(),
       send: vi.fn(),
@@ -28,9 +28,9 @@ describe('useAnalysis Hook', () => {
       addEventListener: vi.fn(),
       status: 200,
       responseText: '',
+      timeout: 0,
     };
 
-    // 2. Create a Mock Class that behaves like XMLHttpRequest
     class MockXMLHttpRequest {
       open(...args: any[]) { return mockXHR.open(...args); }
       send(...args: any[]) { return mockXHR.send(...args); }
@@ -41,9 +41,10 @@ describe('useAnalysis Hook', () => {
       set status(v) { mockXHR.status = v; }
       get responseText() { return mockXHR.responseText; }
       set responseText(v) { mockXHR.responseText = v; }
+      get timeout() { return mockXHR.timeout; }
+      set timeout(v) { mockXHR.timeout = v; }
     }
 
-    // 3. Assign to global
     vi.stubGlobal('XMLHttpRequest', MockXMLHttpRequest);
   });
 
@@ -87,132 +88,255 @@ describe('useAnalysis Hook', () => {
     expect(result.current.loading).toBe(false);
   });
 
-  it('should handle successful analysis flow', async () => {
+  it('should reject files over 200MB', async () => {
     const { result } = renderHook(() => useAnalysis());
-    const file = new File(['dummy content'], 'test.mp4', { type: 'video/mp4' });
-    const mockResponse = {
+    // Create a File-like object with size > 200MB
+    const bigFile = new File([], 'big.mp4', { type: 'video/mp4' });
+    Object.defineProperty(bigFile, 'size', { value: 201 * 1024 * 1024 });
+
+    act(() => {
+      result.current.setFile(bigFile);
+    });
+
+    await act(async () => {
+      await result.current.analyze();
+    });
+
+    expect(result.current.error).toBe('Video file is too large. Maximum size is 200MB.');
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('should handle successful three-step analysis flow', async () => {
+    const mockAnalysisResponse = {
       status: 200,
       message: 'Success',
-      metrics: { data: { jump_height_m: 0.5 } }
+      metrics: { data: { jump_height_m: 0.5 } },
     };
 
-    // Setup behavior
-    const eventListeners: Record<string, EventListener> = {};
-    const uploadEventListeners: Record<string, EventListener> = {};
+    // Mock fetch: step 1 (presign) then step 3 (analyze)
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          upload_url: 'https://r2.example.com/presigned-put',
+          object_key: 'videos/uploads/test.mp4',
+          expires_in: 900,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockAnalysisResponse),
+      });
+    vi.stubGlobal('fetch', mockFetch);
 
+    // Mock XHR for step 2 (R2 upload) — auto-resolve on send
+    const xhrEventListeners: Record<string, EventListener> = {};
     mockXHR.addEventListener.mockImplementation((event: string, cb: EventListener) => {
-      eventListeners[event] = cb;
+      xhrEventListeners[event] = cb;
     });
-    mockXHR.upload.addEventListener.mockImplementation((event: string, cb: EventListener) => {
-      uploadEventListeners[event] = cb;
+    mockXHR.send.mockImplementation(() => {
+      mockXHR.status = 200;
+      // Simulate immediate success
+      setTimeout(() => {
+        if (xhrEventListeners['load']) {
+          xhrEventListeners['load']({} as Event);
+        }
+      }, 0);
     });
-    mockXHR.status = 200;
-    mockXHR.responseText = JSON.stringify(mockResponse);
 
-    // Set file
+    const { result } = renderHook(() => useAnalysis());
+    const file = new File(['dummy content'], 'test.mp4', { type: 'video/mp4' });
+
     act(() => {
       result.current.setFile(file);
     });
 
-    // Trigger analyze
-    let analyzePromise: Promise<void>;
     await act(async () => {
-      analyzePromise = result.current.analyze();
-    });
-
-    // Check loading state (sync check after async start)
-    expect(result.current.loading).toBe(true);
-
-    // Simulate Upload Progress
-    act(() => {
-      if (uploadEventListeners['progress']) {
-        uploadEventListeners['progress']({
-          lengthComputable: true,
-          loaded: 50,
-          total: 100
-        } as ProgressEvent);
-      }
-    });
-
-    expect(result.current.uploadProgress).toBe(50);
-
-    // Simulate Success
-    await act(async () => {
-      if (eventListeners['load']) {
-        eventListeners['load']({} as Event);
-      }
+      await result.current.analyze();
     });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.metrics).toEqual(mockResponse);
+    expect(result.current.metrics).toEqual(mockAnalysisResponse);
     expect(result.current.error).toBeNull();
-    expect(mockXHR.open).toHaveBeenCalledWith('POST', expect.stringContaining('/api/analyze'));
-    expect(mockXHR.setRequestHeader).toHaveBeenCalledWith('Authorization', 'Bearer mock-token');
+
+    // Verify presign fetch was called
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    // Step 1: presign
+    expect(mockFetch.mock.calls[0][0]).toContain('/api/upload/presign');
+    // Step 3: analyze
+    expect(mockFetch.mock.calls[1][0]).toContain('/api/analyze');
+
+    // Verify XHR was used for R2 upload
+    expect(mockXHR.open).toHaveBeenCalledWith('PUT', 'https://r2.example.com/presigned-put');
+    expect(mockXHR.setRequestHeader).toHaveBeenCalledWith('Content-Type', 'video/mp4');
   });
 
-  it('should handle API error', async () => {
+  it('should handle presign API error', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ detail: 'Internal server error' }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
     const { result } = renderHook(() => useAnalysis());
     const file = new File(['dummy content'], 'test.mp4', { type: 'video/mp4' });
-    const errorMessage = 'Invalid video format';
-
-    // Setup behavior
-    const eventListeners: Record<string, EventListener> = {};
-    mockXHR.addEventListener.mockImplementation((event: string, cb: EventListener) => {
-      eventListeners[event] = cb;
-    });
-    mockXHR.status = 400;
-    mockXHR.responseText = JSON.stringify({ error: errorMessage });
 
     act(() => {
       result.current.setFile(file);
     });
 
     await act(async () => {
-      result.current.analyze();
+      await result.current.analyze();
     });
 
-    // Simulate Error Load
-    await act(async () => {
-      if (eventListeners['load']) {
-        eventListeners['load']({} as Event);
-      }
-    });
-
-    expect(result.current.error).toBe(errorMessage);
+    expect(result.current.error).toBe('Internal server error');
     expect(result.current.loading).toBe(false);
     expect(result.current.metrics).toBeNull();
   });
 
-  it('should handle Network error', async () => {
+  it('should handle R2 upload network error', async () => {
+    // Step 1 (presign) succeeds
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        upload_url: 'https://r2.example.com/presigned-put',
+        object_key: 'videos/test.mp4',
+        expires_in: 900,
+      }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    // Step 2 (R2 upload) fails with network error
+    const xhrEventListeners: Record<string, EventListener> = {};
+    mockXHR.addEventListener.mockImplementation((event: string, cb: EventListener) => {
+      xhrEventListeners[event] = cb;
+    });
+    mockXHR.send.mockImplementation(() => {
+      setTimeout(() => {
+        if (xhrEventListeners['error']) {
+          xhrEventListeners['error']({} as Event);
+        }
+      }, 0);
+    });
+
     const { result } = renderHook(() => useAnalysis());
     const file = new File(['dummy content'], 'test.mp4', { type: 'video/mp4' });
-
-    // Setup behavior
-    const eventListeners: Record<string, EventListener> = {};
-    mockXHR.addEventListener.mockImplementation((event: string, cb: EventListener) => {
-      eventListeners[event] = cb;
-    });
 
     act(() => {
       result.current.setFile(file);
     });
 
     await act(async () => {
-      result.current.analyze();
+      await result.current.analyze();
     });
 
-    // Simulate Network Error
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.error).toBe('Network error: Unable to upload video');
+  });
+
+  it('should handle analysis API error after successful upload', async () => {
+    // Step 1 (presign) succeeds
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          upload_url: 'https://r2.example.com/presigned-put',
+          object_key: 'videos/uploads/test.mp4',
+          expires_in: 900,
+        }),
+      })
+      // Step 3 (analyze) fails
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ message: 'Video processing failed' }),
+      });
+    vi.stubGlobal('fetch', mockFetch);
+
+    // Step 2 (R2 upload) succeeds
+    const xhrEventListeners: Record<string, EventListener> = {};
+    mockXHR.addEventListener.mockImplementation((event: string, cb: EventListener) => {
+      xhrEventListeners[event] = cb;
+    });
+    mockXHR.send.mockImplementation(() => {
+      mockXHR.status = 200;
+      setTimeout(() => {
+        if (xhrEventListeners['load']) {
+          xhrEventListeners['load']({} as Event);
+        }
+      }, 0);
+    });
+
+    const { result } = renderHook(() => useAnalysis());
+    const file = new File(['dummy content'], 'test.mp4', { type: 'video/mp4' });
+
+    act(() => {
+      result.current.setFile(file);
+    });
+
     await act(async () => {
-      if (eventListeners['error']) {
-        eventListeners['error']({} as Event);
-      }
+      await result.current.analyze();
     });
 
-    expect(result.current.error).toBe('Network error: Unable to connect to the server');
-    expect(result.current.loading).toBe(false);
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.error).toBe('Video processing failed');
+    expect(result.current.metrics).toBeNull();
+    // Verify both fetch calls were made (upload succeeded, analysis failed)
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('should handle R2 upload timeout', async () => {
+    // Step 1 (presign) succeeds
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        upload_url: 'https://r2.example.com/presigned-put',
+        object_key: 'videos/test.mp4',
+        expires_in: 900,
+      }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    // Step 2 (R2 upload) times out
+    const xhrEventListeners: Record<string, EventListener> = {};
+    mockXHR.addEventListener.mockImplementation((event: string, cb: EventListener) => {
+      xhrEventListeners[event] = cb;
+    });
+    mockXHR.send.mockImplementation(() => {
+      setTimeout(() => {
+        if (xhrEventListeners['timeout']) {
+          xhrEventListeners['timeout']({} as Event);
+        }
+      }, 0);
+    });
+
+    const { result } = renderHook(() => useAnalysis());
+    const file = new File(['dummy content'], 'test.mp4', { type: 'video/mp4' });
+
+    act(() => {
+      result.current.setFile(file);
+    });
+
+    await act(async () => {
+      await result.current.analyze();
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.error).toBe('Upload timed out. Please check your connection and try again.');
+    expect(mockXHR.timeout).toBe(5 * 60 * 1000);
   });
 
   it('should reset state', () => {

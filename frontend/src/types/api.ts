@@ -96,6 +96,15 @@ export interface AnalysisResponse {
 }
 
 /**
+ * Response from the presigned upload endpoint
+ */
+export interface PresignResponse {
+  upload_url: string
+  object_key: string
+  expires_in: number
+}
+
+/**
  * Supported jump types
  */
 export type JumpType = 'cmj' | 'dropjump'

@@ -317,3 +317,143 @@ def test_analyze_response_no_results_url_without_r2(
 
     # results_url should not be in response without R2
     assert "results_url" not in data or data.get("results_url") is None
+
+
+# --- Presigned upload endpoint tests ---
+
+
+def test_presign_endpoint_success(client: TestClient) -> None:
+    """Test that presign endpoint returns upload_url and object_key."""
+    with (
+        patch(
+            "kinemotion_backend.services.storage_service.StorageService.generate_unique_key"
+        ) as mock_key,
+        patch(
+            "kinemotion_backend.models.storage.R2StorageClient.generate_presigned_upload_url"
+        ) as mock_presign,
+    ):
+        mock_key.return_value = "uploads/test@example.com/2026/03/03/abc.mp4"
+        mock_presign.return_value = "https://r2.example.com/presigned-put-url"
+
+        response = client.post(
+            "/api/upload/presign",
+            data={"filename": "test.mp4", "content_type": "video/mp4"},
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "upload_url" in data
+    assert "object_key" in data
+    assert "expires_in" in data
+    assert data["upload_url"] == "https://r2.example.com/presigned-put-url"
+    assert data["expires_in"] == 900
+
+
+def test_presign_endpoint_invalid_content_type(client: TestClient) -> None:
+    """Test that presign endpoint rejects non-video content types."""
+    response = client.post(
+        "/api/upload/presign",
+        data={"filename": "test.pdf", "content_type": "application/pdf"},
+    )
+
+    assert response.status_code == 422
+    data = response.json()
+    assert "video/" in data.get("message", data.get("detail", ""))
+
+
+def test_presign_endpoint_requires_auth() -> None:
+    """Test that presign endpoint requires authentication."""
+    from kinemotion_backend.app.main import create_application
+
+    app = create_application()
+    unauthenticated_client = TestClient(app)
+
+    response = unauthenticated_client.post(
+        "/api/upload/presign",
+        data={"filename": "test.mp4", "content_type": "video/mp4"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_analyze_with_video_key(client: TestClient) -> None:
+    """Test that analyze endpoint accepts video_key for R2-based analysis."""
+    with patch(
+        "kinemotion_backend.services.analysis_service.AnalysisService.analyze_from_r2_key"
+    ) as mock_analyze:
+        from kinemotion_backend.models.responses import AnalysisResponse, MetricsData
+
+        mock_analyze.return_value = AnalysisResponse(
+            status_code=200,
+            message="Analysis completed successfully",
+            metrics=MetricsData(
+                data={"jump_height_m": 0.45, "flight_time_s": 0.60},
+                metadata={"quality": "balanced"},
+                validation={"status": "PASS", "issues": []},
+            ),
+            results_url="https://r2.example.com/results/test.json",
+            original_video_url="https://r2.example.com/videos/test.mp4",
+            processing_time_s=1.5,
+        )
+
+        response = client.post(
+            "/api/analyze",
+            data={
+                "video_key": "videos/uploads/test@example.com/2026/03/03/abc.mp4",
+                "jump_type": "cmj",
+            },
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status_code"] == 200
+    mock_analyze.assert_called_once()
+    call_kwargs = mock_analyze.call_args[1]
+    assert call_kwargs["video_key"] == "videos/uploads/test@example.com/2026/03/03/abc.mp4"
+
+
+def test_analyze_with_video_key_wrong_user(client: TestClient) -> None:
+    """Test that video_key belonging to a different user is rejected (403)."""
+    response = client.post(
+        "/api/analyze",
+        data={
+            "video_key": "videos/uploads/other@example.com/2026/03/03/abc.mp4",
+            "jump_type": "cmj",
+        },
+    )
+
+    assert response.status_code == 403
+    data = response.json()
+    error_text = data.get("message", data.get("detail", ""))
+    assert "does not belong" in error_text
+
+
+def test_analyze_with_both_file_and_video_key(
+    client: TestClient,
+    sample_video_bytes: bytes,
+) -> None:
+    """Test that providing both file and video_key is rejected."""
+    files = {"file": ("test.mp4", BytesIO(sample_video_bytes), "video/mp4")}
+    response = client.post(
+        "/api/analyze",
+        files=files,
+        data={"video_key": "videos/uploads/test.mp4", "jump_type": "cmj"},
+    )
+
+    assert response.status_code == 422
+    data = response.json()
+    error_text = data.get("message", data.get("detail", ""))
+    assert "not both" in error_text
+
+
+def test_analyze_with_neither_file_nor_video_key(client: TestClient) -> None:
+    """Test that providing neither file nor video_key is rejected."""
+    response = client.post(
+        "/api/analyze",
+        data={"jump_type": "cmj"},
+    )
+
+    assert response.status_code == 422
+    data = response.json()
+    error_text = data.get("message", data.get("detail", "")).lower()
+    assert "file" in error_text or "video_key" in error_text

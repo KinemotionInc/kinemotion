@@ -5,6 +5,12 @@ import structlog
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
+# Default expiration for presigned upload URLs (15 minutes)
+PRESIGN_UPLOAD_EXPIRATION_S = 900
+
+# Prefix for video objects in R2 (e.g. "videos/uploads/user/…/uuid.mp4")
+VIDEO_KEY_PREFIX = "videos/"
+
 
 class R2StorageClient:
     """Cloudflare R2 storage client for video and results management."""
@@ -71,6 +77,35 @@ class R2StorageClient:
         if self.public_base_url:
             return f"{self.public_base_url}/{normalized_key}"
         return self.generate_presigned_url(normalized_key, expiration=self.presign_expiration_s)
+
+    def generate_presigned_upload_url(
+        self, key: str, content_type: str, expiration: int = PRESIGN_UPLOAD_EXPIRATION_S
+    ) -> str:
+        """Generate a presigned URL for uploading (PUT) an object directly to R2.
+
+        Args:
+            key: Object key to upload to
+            content_type: MIME type of the file (must match the actual upload)
+            expiration: URL expiration in seconds (default 15 minutes)
+
+        Returns:
+            Presigned PUT URL string
+
+        Raises:
+            OSError: If generation fails
+        """
+        try:
+            return self.client.generate_presigned_url(
+                "put_object",
+                Params={
+                    "Bucket": self.bucket_name,
+                    "Key": key,
+                    "ContentType": content_type,
+                },
+                ExpiresIn=expiration,
+            )
+        except Exception as e:
+            raise OSError(f"Failed to generate presigned upload URL: {str(e)}") from e
 
     def upload_file(self, local_path: str, remote_key: str) -> str:
         """Upload file to R2 storage.
