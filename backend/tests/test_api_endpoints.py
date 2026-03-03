@@ -412,6 +412,22 @@ def test_analyze_with_video_key(client: TestClient) -> None:
     assert call_kwargs["video_key"] == "videos/uploads/test@example.com/2026/03/03/abc.mp4"
 
 
+def test_analyze_with_video_key_wrong_user(client: TestClient) -> None:
+    """Test that video_key belonging to a different user is rejected (403)."""
+    response = client.post(
+        "/api/analyze",
+        data={
+            "video_key": "videos/uploads/other@example.com/2026/03/03/abc.mp4",
+            "jump_type": "cmj",
+        },
+    )
+
+    assert response.status_code == 403
+    data = response.json()
+    error_text = data.get("message", data.get("detail", ""))
+    assert "does not belong" in error_text
+
+
 def test_analyze_with_both_file_and_video_key(
     client: TestClient,
     sample_video_bytes: bytes,

@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 import tempfile
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fastapi import UploadFile
+
+if TYPE_CHECKING:
+    from kinemotion.core.demographics import AthleteDemographics
 
 from ..logging_config import get_logger
 from ..models.responses import AnalysisResponse, MetricsData
@@ -176,7 +182,6 @@ class AnalysisService:
         jump_type: str,
         quality: str = "balanced",
         debug: bool = False,
-        user_id: str | None = None,
         sex: str | None = None,
         age: int | None = None,
         training_level: str | None = None,
@@ -191,7 +196,6 @@ class AnalysisService:
             jump_type: Type of jump analysis
             quality: Analysis quality preset
             debug: Whether to generate debug overlay video
-            user_id: Optional user ID for storage organization
             sex: Biological sex for normative comparison
             age: Athlete age in years for normative comparison
             training_level: Training level for normative comparison
@@ -233,18 +237,7 @@ class AnalysisService:
                     temp_debug.close()
                     paths["debug_path"] = temp_debug_video_path
 
-                # Build demographics
-                from kinemotion.core.demographics import (
-                    AthleteDemographics,
-                    BiologicalSex,
-                    TrainingLevel,
-                )
-
-                demo_sex = BiologicalSex(sex) if sex else None
-                demo_training = TrainingLevel(training_level) if training_level else None
-                demographics = AthleteDemographics(
-                    sex=demo_sex, age=age, training_level=demo_training
-                )
+                demographics = self._build_demographics(sex, age, training_level)
 
                 # Process video
                 logger.info("video_processing_started")
@@ -266,45 +259,18 @@ class AnalysisService:
                 debug_video_url = await self._upload_debug_video(temp_debug_video_path, video_key)
                 original_video_url = self.storage_service.client.get_object_url(video_key)
 
-                # Generate coaching interpretations
-                metrics_data = metrics.get("data") or {}
-                validation = metrics.get("validation") or {}
-                if "reactive_strength_index" not in metrics_data and "rsi" in validation:
-                    rsi_val = validation["rsi"]
-                    if isinstance(rsi_val, (int, float)):
-                        metrics_data["reactive_strength_index"] = rsi_val
-
-                from .interpretation_service import interpret_metrics
-
-                interpretation = interpret_metrics(
-                    normalized_jump_type,
-                    metrics_data,
-                    sex=sex,
-                    age=age,
-                    training_level=training_level,
-                )
-                if interpretation:
-                    metrics["interpretation"] = interpretation
-
-                processing_time = time.perf_counter() - start_time
-                response = AnalysisResponse(
-                    status_code=200,
-                    message="Analysis completed successfully",
-                    metrics=MetricsData(**metrics),
+                return self._enrich_and_build_response(
+                    metrics=metrics,
+                    normalized_jump_type=normalized_jump_type,
+                    start_time=start_time,
                     results_url=results_url,
                     debug_video_url=debug_video_url,
                     original_video_url=original_video_url,
-                    error=None,
-                    processing_time_s=processing_time,
-                )
-
-                logger.info(
-                    "video_analysis_completed",
-                    jump_type=normalized_jump_type,
-                    duration_ms=round(processing_time * 1000, 1),
+                    sex=sex,
+                    age=age,
+                    training_level=training_level,
                     upload_mode="r2_key",
                 )
-                return response
 
             except ValueError:
                 raise
@@ -399,16 +365,7 @@ class AnalysisService:
             paths["debug_path"] = temp_debug_video_path
             logger.info("debug_video_path_created", debug_video_path=temp_debug_video_path)
 
-        # Build demographics for CLI validation
-        from kinemotion.core.demographics import (
-            AthleteDemographics,
-            BiologicalSex,
-            TrainingLevel,
-        )
-
-        demo_sex = BiologicalSex(sex) if sex else None
-        demo_training = TrainingLevel(training_level) if training_level else None
-        demographics = AthleteDemographics(sex=demo_sex, age=age, training_level=demo_training)
+        demographics = self._build_demographics(sex, age, training_level)
 
         # Process video with detailed timing
         logger.info("video_processing_started")
@@ -430,54 +387,17 @@ class AnalysisService:
         results_url = await self._upload_results(metrics, storage_key)
         debug_video_url = await self._upload_debug_video(temp_debug_video_path, storage_key)
 
-        # Generate coaching interpretations from metrics
-        metrics_data = metrics.get("data") or {}
-
-        # RSI is computed in validation, not in data — enrich for interpretation
-        validation = metrics.get("validation") or {}
-        if "reactive_strength_index" not in metrics_data and "rsi" in validation:
-            rsi_val = validation["rsi"]
-            if isinstance(rsi_val, (int, float)):
-                metrics_data["reactive_strength_index"] = rsi_val
-
-        interpretation = interpret_metrics(
-            normalized_jump_type,
-            metrics_data,
+        return self._enrich_and_build_response(
+            metrics=metrics,
+            normalized_jump_type=normalized_jump_type,
+            start_time=start_time,
+            results_url=results_url,
+            debug_video_url=debug_video_url,
+            original_video_url=original_video_url,
             sex=sex,
             age=age,
             training_level=training_level,
         )
-        if interpretation:
-            metrics["interpretation"] = interpretation
-
-        # Build response
-        processing_time = time.perf_counter() - start_time
-        metrics_count = len(metrics.get("data", {}))
-
-        serialization_start = time.perf_counter()
-        response = AnalysisResponse(
-            status_code=200,
-            message="Analysis completed successfully",
-            metrics=MetricsData(**metrics),
-            results_url=results_url,
-            debug_video_url=debug_video_url,
-            original_video_url=original_video_url,
-            error=None,
-            processing_time_s=processing_time,
-        )
-        logger.info(
-            "response_serialization",
-            duration_ms=round((time.perf_counter() - serialization_start) * 1000, 1),
-        )
-
-        logger.info(
-            "video_analysis_completed",
-            jump_type=normalized_jump_type,
-            duration_ms=round(processing_time * 1000, 1),
-            metrics_count=metrics_count,
-        )
-
-        return response
 
     def _log_stage_metrics(self, stage_metrics: dict[str, float]) -> None:
         """Log individual pipeline stage timings.
@@ -494,6 +414,105 @@ class AnalysisService:
             total_duration_s=round(total_duration_s, 2),
             duration_ms=round(total_duration_s * 1000, 1),
         )
+
+    @staticmethod
+    def _build_demographics(
+        sex: str | None,
+        age: int | None,
+        training_level: str | None,
+    ) -> AthleteDemographics:
+        """Build demographics object from optional fields.
+
+        Args:
+            sex: Biological sex string
+            age: Athlete age in years
+            training_level: Training level string
+
+        Returns:
+            AthleteDemographics instance
+        """
+        from kinemotion.core.demographics import (
+            AthleteDemographics,
+            BiologicalSex,
+            TrainingLevel,
+        )
+
+        demo_sex = BiologicalSex(sex) if sex else None
+        demo_training = TrainingLevel(training_level) if training_level else None
+        return AthleteDemographics(sex=demo_sex, age=age, training_level=demo_training)
+
+    def _enrich_and_build_response(
+        self,
+        metrics: dict,
+        normalized_jump_type: str,
+        start_time: float,
+        results_url: str,
+        debug_video_url: str | None,
+        original_video_url: str,
+        sex: str | None = None,
+        age: int | None = None,
+        training_level: str | None = None,
+        upload_mode: str = "file_upload",
+    ) -> AnalysisResponse:
+        """Enrich metrics with interpretation and build the final response.
+
+        Handles RSI extraction from validation, coaching interpretation generation,
+        and AnalysisResponse construction. Shared by ``_process_video`` and
+        ``analyze_from_r2_key``.
+
+        Args:
+            metrics: Raw metrics dictionary from video processing
+            normalized_jump_type: Validated jump type
+            start_time: Start time for processing duration calculation
+            results_url: URL of uploaded results JSON
+            debug_video_url: URL of debug video or None
+            original_video_url: URL of original video
+            sex: Biological sex for interpretation
+            age: Athlete age for interpretation
+            training_level: Training level for interpretation
+            upload_mode: Upload mode label for logging
+
+        Returns:
+            AnalysisResponse with enriched metrics
+        """
+        # RSI is computed in validation, not in data — enrich for interpretation
+        metrics_data = metrics.get("data") or {}
+        validation = metrics.get("validation") or {}
+        if "reactive_strength_index" not in metrics_data and "rsi" in validation:
+            rsi_val = validation["rsi"]
+            if isinstance(rsi_val, (int, float)):
+                metrics_data["reactive_strength_index"] = rsi_val
+
+        interpretation = interpret_metrics(
+            normalized_jump_type,
+            metrics_data,
+            sex=sex,
+            age=age,
+            training_level=training_level,
+        )
+        if interpretation:
+            metrics["interpretation"] = interpretation
+
+        processing_time = time.perf_counter() - start_time
+
+        response = AnalysisResponse(
+            status_code=200,
+            message="Analysis completed successfully",
+            metrics=MetricsData(**metrics),
+            results_url=results_url,
+            debug_video_url=debug_video_url,
+            original_video_url=original_video_url,
+            error=None,
+            processing_time_s=processing_time,
+        )
+
+        logger.info(
+            "video_analysis_completed",
+            jump_type=normalized_jump_type,
+            duration_ms=round(processing_time * 1000, 1),
+            upload_mode=upload_mode,
+        )
+        return response
 
     async def _upload_original_video(self, temp_path: str, storage_key: str) -> str:
         """Upload original video to storage.

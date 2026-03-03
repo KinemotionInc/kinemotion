@@ -77,7 +77,7 @@ async def get_user_email_for_analysis(
 @router.post("/upload/presign")
 @limit("5/minute")
 async def presign_upload(
-    request: Request,
+    request: Request,  # required by slowapi @limit decorator
     filename: str = Form(...),  # noqa: B008
     content_type: str = Form(...),  # noqa: B008
     email: str = Depends(get_user_email_for_analysis),  # noqa: B008
@@ -195,6 +195,17 @@ async def analyze_video(
             detail="Provide either 'file' (upload) or 'video_key' (presigned upload).",
         )
 
+    # Validate video_key ownership before entering the processing try-block
+    if has_key:
+        assert video_key is not None
+        sanitized_key = video_key.strip()
+        expected_prefix = f"videos/uploads/{email}/"
+        if not sanitized_key.startswith(expected_prefix):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Video key does not belong to the authenticated user.",
+            )
+
     try:
         # Convert debug string to boolean
         enable_debug = debug.lower() == "true"
@@ -222,7 +233,6 @@ async def analyze_video(
                 jump_type=jump_type,
                 quality=quality,
                 debug=enable_debug,
-                user_id=email,
                 sex=normalized_sex,
                 age=age,
                 training_level=normalized_training_level,
