@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- version list -->
 
+## kinemotion-v0.82.0 (2026-03-03)
+
+### Feat
+
+- **upload**: presigned URL uploads to bypass Cloud Run 32MiB limit (#19)
+
 ## kinemotion-v0.81.1 (2026-02-24)
 
 ### Fix
