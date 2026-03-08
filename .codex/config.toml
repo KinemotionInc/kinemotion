@@ -1,0 +1,88 @@
+# Relative paths here resolve from `.codex/`.
+# `cwd = ".."` starts servers from the repo root so we can use `.` instead of
+# hardcoded absolute paths.
+# Codex automatically discovers shared repo skills from `.agents/skills`,
+# so this file only needs to define the project MCP servers.
+
+model = "gpt-5.4"
+model_reasoning_effort = "high"
+
+# Run Exa inside the repo's direnv environment.
+[mcp_servers.exa]
+command = "direnv"
+cwd = ".."
+args = [
+  "exec",
+  ".",
+  "bunx",
+  "-y",
+  "exa-mcp-server",
+]
+
+# Run Ref tools inside the repo's direnv environment.
+[mcp_servers.ref]
+command = "direnv"
+cwd = ".."
+args = [
+  "exec",
+  ".",
+  "bunx",
+  "-y",
+  "ref-tools-mcp@latest",
+]
+
+# Use the repo root for consistent MCP startup behavior.
+[mcp_servers.basic-memory]
+command = "mise"
+cwd = ".."
+args = [
+  "exec",
+  "--",
+  "uvx",
+  "basic-memory",
+  "mcp",
+  "--project=kinemotion",
+]
+
+[mcp_servers.basic-memory.env]
+BASIC_MEMORY_KEBAB_FILENAMES = "true"
+
+# Use the repo root for consistent MCP startup behavior.
+[mcp_servers.sequential-thinking]
+command = "mise"
+cwd = ".."
+args = [
+  "exec",
+  "--",
+  "uvx",
+  "--from",
+  "git+https://github.com/arben-adm/mcp-sequential-thinking",
+  "--with",
+  "portalocker",
+  "mcp-sequential-thinking",
+]
+
+# Serena also uses the repo root as its explicit `--project` target.
+[mcp_servers.serena]
+command = "mise"
+cwd = ".."
+args = [
+  "exec",
+  "--",
+  "uvx",
+  "--from",
+  "git+https://github.com/oraios/serena",
+  "serena",
+  "start-mcp-server",
+  "--context",
+  "codex",
+]
+
+# Use the repo root for consistent MCP startup behavior.
+[mcp_servers.code-reasoning]
+command = "npx"
+cwd = ".."
+args = [
+  "-y",
+  "github:feniix/code-reasoning#fix-strict-stdio-startup",
+]
