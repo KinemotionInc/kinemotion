@@ -16,7 +16,6 @@ from ..core.auto_tuning import (
     auto_tune_parameters,
 )
 from ..core.demographics import AthleteDemographics, training_level_to_profile
-from ..core.experimental import experimental
 from ..core.filtering import reject_outliers
 from ..core.metadata import (
     AlgorithmConfig,
@@ -434,12 +433,6 @@ class SJVideoResult:
     processing_time: float = 0.0
 
 
-@experimental(
-    "Squat Jump analysis is new and awaiting validation studies. "
-    "Power/force calculations use validated Sayers regression but SJ-specific "
-    "phase detection may need refinement based on real-world data.",
-    since="0.74.0",
-)
 def process_sj_video(
     video_path: str,
     quality: str = "balanced",
@@ -573,11 +566,6 @@ def process_sj_video_from_config(
     return process_sj_video(**config.to_kwargs())
 
 
-@experimental(
-    "Squat Jump analysis is new and awaiting validation studies. "
-    "Bulk processing uses parallel workers which may need tuning for large batches.",
-    since="0.74.0",
-)
 def process_sj_videos_bulk(
     configs: list[SJVideoConfig],
     max_workers: int = 4,

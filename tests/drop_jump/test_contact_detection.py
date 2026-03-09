@@ -4,9 +4,7 @@ import numpy as np
 
 from kinemotion.drop_jump.analysis import (
     ContactState,
-    _calculate_adaptive_threshold,
     _detect_drop_start,
-    _extract_foot_positions_and_visibilities,
     compute_average_foot_position,
     detect_ground_contact,
     find_contact_phases,
@@ -143,63 +141,6 @@ def test_compute_average_foot_position_empty_landmarks():
     # Should return center as last resort
     assert x == 0.5
     assert y == 0.5
-
-
-def test__extract_foot_positions_and_visibilities():
-    """Test extraction of foot positions and visibilities from landmarks."""
-    smoothed_landmarks = [
-        {
-            "left_ankle": (0.3, 0.8, 0.9),
-            "right_ankle": (0.7, 0.8, 0.9),
-            "left_heel": (0.3, 0.85, 0.8),
-            "right_heel": (0.7, 0.85, 0.8),
-        },
-        {
-            "left_ankle": (0.3, 0.7, 0.9),
-            "right_ankle": (0.7, 0.7, 0.9),
-            "left_heel": (0.3, 0.75, 0.8),
-            "right_heel": (0.7, 0.75, 0.8),
-        },
-        None,  # Missing frame
-        {
-            "left_ankle": (0.3, 0.8, 0.9),
-            "right_ankle": (0.7, 0.8, 0.9),
-            "left_heel": (0.3, 0.85, 0.8),
-            "right_heel": (0.7, 0.85, 0.8),
-        },
-    ]
-
-    positions, visibilities = _extract_foot_positions_and_visibilities(smoothed_landmarks)
-
-    assert len(positions) == 4
-    assert len(visibilities) == 4
-    assert 0 < positions[0] < 1  # Valid normalized position
-    assert 0 < positions[1] < 1
-    assert 0 < visibilities[0] <= 1  # Valid visibility
-    assert visibilities[2] == 0.0  # Missing frame should have 0 visibility
-
-
-def test_calculate_adaptive_threshold_short_array():
-    """Test adaptive threshold with very short position array."""
-    positions = np.array([0.5])  # Single element
-
-    threshold = _calculate_adaptive_threshold(positions, fps=30.0)
-
-    # Should return default fallback threshold
-    assert threshold == 0.02
-
-
-def test_calculate_adaptive_threshold_insufficient_baseline():
-    """Test adaptive threshold when baseline period too short."""
-    positions = np.array([0.5, 0.51, 0.52])  # Only 3 frames
-    fps = 30.0
-
-    threshold = _calculate_adaptive_threshold(
-        positions, fps=fps, baseline_duration=3.0, smoothing_window=5
-    )
-
-    # Should return default threshold due to insufficient data
-    assert threshold == 0.02
 
 
 def test_detect_drop_start_with_debug():

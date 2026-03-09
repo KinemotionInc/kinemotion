@@ -5,8 +5,6 @@ from numpy.lib.stride_tricks import sliding_window_view
 from scipy.ndimage import convolve1d
 from scipy.signal import medfilt
 
-from .experimental import unused
-
 
 def _ensure_odd_window_length(window_length: int) -> int:
     """Ensure window_length is odd (required for Savitzky-Golay filter).
@@ -277,68 +275,6 @@ def reject_outliers(
         cleaned_positions = positions.copy()
 
     return cleaned_positions, outlier_mask
-
-
-@unused(
-    reason="Not called by analysis pipeline - alternative adaptive smoothing approach",
-    remove_in="1.0.0",
-    since="0.34.0",
-)
-def adaptive_smooth_window(
-    positions: np.ndarray,
-    base_window: int = 5,
-    velocity_threshold: float = 0.02,
-    min_window: int = 3,
-    max_window: int = 11,
-) -> np.ndarray:
-    """
-    Determine adaptive smoothing window size based on local motion velocity.
-
-    Uses larger windows during slow motion (ground contact) and smaller windows
-    during fast motion (flight) to preserve details where needed while smoothing
-    where safe.
-
-    Args:
-        positions: 1D array of position values
-        base_window: Base window size (default: 5)
-        velocity_threshold: Velocity below which to use larger window
-        min_window: Minimum window size (for fast motion)
-        max_window: Maximum window size (for slow motion)
-
-    Returns:
-        Array of window sizes for each frame
-    """
-    n = len(positions)
-    windows = np.full(n, base_window, dtype=int)
-
-    if n < 2:
-        return windows
-
-    # Compute local velocity (simple diff)
-    velocities = np.abs(np.diff(positions, prepend=positions[0]))
-
-    # Smooth velocity to avoid spurious changes
-    if n >= 5:
-        from scipy.signal import medfilt
-
-        velocities = medfilt(velocities, kernel_size=5)
-
-    # Assign window sizes based on velocity
-    for i in range(n):
-        if velocities[i] < velocity_threshold / 2:
-            # Very slow motion - use maximum window
-            windows[i] = max_window
-        elif velocities[i] < velocity_threshold:
-            # Slow motion - use larger window
-            windows[i] = (base_window + max_window) // 2
-        else:
-            # Fast motion - use smaller window
-            windows[i] = min_window
-
-    # Ensure windows are odd
-    windows = np.where(windows % 2 == 0, windows + 1, windows)
-
-    return windows
 
 
 def bilateral_temporal_filter(
