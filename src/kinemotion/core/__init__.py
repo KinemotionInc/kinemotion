@@ -1,7 +1,6 @@
 """Core functionality shared across all jump analysis types."""
 
 from .filtering import (
-    adaptive_smooth_window,
     bilateral_temporal_filter,
     detect_outliers_median,
     detect_outliers_ransac,
@@ -67,7 +66,6 @@ __all__ = [
     "detect_outliers_median",
     "remove_outliers",
     "reject_outliers",
-    "adaptive_smooth_window",
     "bilateral_temporal_filter",
     # Quality Assessment
     "QualityAssessment",

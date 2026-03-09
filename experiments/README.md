@@ -4,5 +4,5 @@ This directory contains experimental code, prototypes, and research scripts that
 
 ## Structure
 
-- Use subdirectories for specific experiments (e.g., `experiments/tfjs-prototype`)
+- Use subdirectories for specific experiments
 - Add a README in each subdirectory explaining the experiment's goal.

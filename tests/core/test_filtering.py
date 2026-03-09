@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 
 from kinemotion.core.filtering import (
-    adaptive_smooth_window,
     bilateral_temporal_filter,
     detect_outliers_median,
     detect_outliers_ransac,
@@ -145,46 +144,6 @@ def test_reject_outliers_median_only() -> None:
     assert np.sum(outliers) >= 1
     # Cleaned value should be close to 0.5
     assert abs(cleaned[15] - 0.5) < 0.1
-
-
-def test_adaptive_smooth_window_varies_with_velocity() -> None:
-    """Test that adaptive window size adjusts based on motion velocity."""
-    # Create motion with slow and fast phases
-    positions = np.concatenate(
-        [
-            np.array([0.5] * 20),  # Slow/stationary
-            np.linspace(0.5, 0.7, 20),  # Fast motion
-            np.array([0.7] * 20),  # Slow/stationary
-        ]
-    )
-
-    windows = adaptive_smooth_window(
-        positions,
-        base_window=5,
-        velocity_threshold=0.02,
-        min_window=3,
-        max_window=11,
-    )
-
-    # Stationary phases should have larger windows
-    assert np.mean(windows[:20]) > np.mean(windows[20:40]), "Slow motion should use larger windows"
-    assert np.mean(windows[40:]) > np.mean(windows[20:40]), "Slow motion should use larger windows"
-
-    # All windows should be odd
-    assert np.all(windows % 2 == 1), "All windows should be odd"
-
-
-def test_adaptive_smooth_window_bounds() -> None:
-    """Test that adaptive window sizes respect min/max bounds."""
-    # Very fast motion
-    positions = np.linspace(0, 1, 50)
-
-    windows = adaptive_smooth_window(positions, base_window=5, min_window=3, max_window=11)
-
-    # All windows should be within bounds
-    assert np.all(windows >= 3), "Windows should respect minimum"
-    assert np.all(windows <= 11), "Windows should respect maximum"
-    assert np.all(windows % 2 == 1), "Windows should be odd"
 
 
 def test_bilateral_temporal_filter_preserves_edges() -> None:

@@ -5,7 +5,6 @@ from enum import Enum
 import numpy as np
 from scipy.signal import savgol_filter
 
-from ..core.experimental import unused
 from ..core.smoothing import compute_acceleration_from_derivative
 from ..core.timing import NULL_TIMER, Timer
 from ..core.types import HIP_KEYS, FloatArray
@@ -144,55 +143,6 @@ def _find_cmj_landing_from_position_peak(
     landing_frame = landing_search_start + impact_idx
 
     return float(landing_frame)
-
-
-@unused(
-    reason="Experimental alternative superseded by backward search algorithm",
-    since="0.34.0",
-)
-def _find_interpolated_takeoff_landing(
-    positions: FloatArray,
-    velocities: FloatArray,
-    lowest_point_frame: int,
-    window_length: int = 5,
-    polyorder: int = 2,
-) -> tuple[float, float] | None:
-    """
-    Find takeoff and landing frames for CMJ using physics-based detection.
-
-    CMJ-specific: Takeoff is detected as peak velocity (end of push-off),
-    not as high velocity threshold (which detects mid-flight).
-
-    Args:
-        positions: Array of vertical positions
-        velocities: Array of vertical velocities
-        lowest_point_frame: Frame at lowest point
-        window_length: Window size for derivative calculations
-        polyorder: Polynomial order for Savitzky-Golay filter
-
-    Returns:
-        Tuple of (takeoff_frame, landing_frame) with fractional precision, or None.
-    """
-    # Get FPS from velocity array length and assumed duration
-    # This is approximate but sufficient for search windows
-    fps = 30.0  # Default assumption
-
-    # Compute accelerations for landing detection
-    accelerations = compute_acceleration_from_derivative(
-        positions, window_length=window_length, polyorder=polyorder
-    )
-
-    # Find takeoff using peak velocity method (CMJ-specific)
-    takeoff_frame = _find_cmj_takeoff_from_velocity_peak(
-        positions, velocities, lowest_point_frame, fps
-    )
-
-    # Find landing using position peak and impact detection
-    landing_frame = _find_cmj_landing_from_position_peak(
-        positions, velocities, accelerations, int(takeoff_frame), fps
-    )
-
-    return (takeoff_frame, landing_frame)
 
 
 def _find_takeoff_frame(

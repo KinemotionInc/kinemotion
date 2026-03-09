@@ -1,11 +1,9 @@
 """R2 storage integration tests (mocked)."""
 
-from io import BytesIO
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 
 from kinemotion_backend.models import R2StorageClient
 
@@ -450,86 +448,6 @@ def test_r2_put_object_error_handling() -> None:
             assert "Failed to put object to R2" in str(exc_info.value)
 
 
-@pytest.mark.skip(
-    reason="Refactored architecture requires R2 credentials at service initialization, "
-    "not runtime. Graceful degradation without R2 is no longer supported."
-)
-def test_r2_graceful_degradation_without_credentials(
-    client: TestClient,
-    sample_video_bytes: bytes,
-    no_r2_env: None,
-) -> None:
-    """Test that endpoint works without R2 credentials configured.
-
-    NOTE: This test is skipped because the refactored architecture requires
-    R2 credentials at AnalysisService initialization time. The previous behavior
-    of graceful degradation at request time is no longer supported.
-    """
-    files = {"file": ("test.mp4", BytesIO(sample_video_bytes), "video/mp4")}
-    response = client.post("/api/analyze", files=files, data={"jump_type": "cmj"})
-
-    # Should still work, just without R2
-    assert response.status_code == 200
-
-
-@pytest.mark.skip(
-    reason="Refactored architecture handles R2 through StorageService "
-    "in dependency injection. This test targets old monolithic app.py "
-    "structure."
-)
-def test_endpoint_handles_r2_upload_failure_gracefully(
-    client: TestClient,
-    sample_video_bytes: bytes,
-) -> None:
-    """Test that endpoint handles R2 upload failures gracefully.
-
-    NOTE: This test is skipped because the refactored architecture handles
-    R2 through the StorageService which is initialized at request time.
-    The old monolithic patching approach no longer works.
-    """
-    # Mock R2 to be configured but fail
-    with patch("kinemotion_backend.app.r2_client") as mock_r2:
-        mock_r2.upload_file.side_effect = OSError("R2 upload failed")
-
-        files = {"file": ("test.mp4", BytesIO(sample_video_bytes), "video/mp4")}
-        response = client.post("/api/analyze", files=files, data={"jump_type": "cmj"})
-
-        # Should return 500 error for R2 failure
-        assert response.status_code == 500
-        data = response.json()
-        assert "Failed to upload video to storage" in data.get("error", "")
-
-
-@pytest.mark.skip(
-    reason="Refactored architecture handles R2 through StorageService "
-    "in dependency injection. This test targets old monolithic app.py "
-    "structure."
-)
-def test_endpoint_handles_r2_results_upload_failure(
-    client: TestClient,
-    sample_video_bytes: bytes,
-) -> None:
-    """Test that results upload failure doesn't crash (graceful degradation).
-
-    NOTE: This test is skipped because the refactored architecture handles
-    R2 through the StorageService which is initialized at request time.
-    The old monolithic patching approach no longer works.
-    """
-    # Mock R2 to fail on results upload but succeed on video upload
-    with patch("kinemotion_backend.app.r2_client") as mock_r2:
-        mock_r2.upload_file.return_value = "https://r2.example.com/video.mp4"
-        mock_r2.put_object.side_effect = OSError("Results upload failed")
-
-        files = {"file": ("test.mp4", BytesIO(sample_video_bytes), "video/mp4")}
-        response = client.post("/api/analyze", files=files, data={"jump_type": "cmj"})
-
-        # Should still succeed (results_url just won't be present)
-        assert response.status_code == 200
-        data = response.json()
-        # results_url might not be present due to failure
-        assert "metrics" in data
-
-
 def test_generate_presigned_upload_url_success() -> None:
     """Test successful presigned upload URL generation."""
     with patch.dict(
@@ -744,7 +662,7 @@ async def test_analyze_from_r2_key_success(
         def to_dict(self) -> dict[str, Any]:
             return sample_cmj_metrics
 
-    with patch("kinemotion_backend.services.video_processor.process_cmj_video") as mock_cmj:
+    with patch("kinemotion_backend.services.analysis_service.process_cmj_video") as mock_cmj:
         mock_cmj.return_value = MockCMJResult()
 
         result = await service.analyze_from_r2_key(

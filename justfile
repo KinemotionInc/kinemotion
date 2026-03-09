@@ -1,3 +1,7 @@
+# Download MediaPipe pose model
+download-model:
+    uv run python -c 'from kinemotion.core.model_downloader import get_model_path; p = get_model_path("lite"); print(f"Model downloaded: {p}")'
+
 # Check python sanity
 python-check:
     @echo "Running pyright..."

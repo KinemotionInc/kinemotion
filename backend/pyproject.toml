@@ -34,7 +34,7 @@ dependencies = [
     # Local development: use editable install via `uv sync`
     # Production deployment: use released package from PyPI
     "kinemotion>=0.70.0",
-    "pre-commit==4.4.0",
+
 ]
 
 [project.urls]

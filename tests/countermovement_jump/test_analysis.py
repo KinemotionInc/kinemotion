@@ -13,7 +13,6 @@ from kinemotion.core.smoothing import (
 from kinemotion.countermovement_jump.analysis import (
     _find_cmj_landing_from_position_peak,
     _find_cmj_takeoff_from_velocity_peak,
-    _find_interpolated_takeoff_landing,
     _find_landing_frame,
     _find_lowest_frame,
     _find_standing_end,
@@ -592,62 +591,6 @@ def test_find_standing_end_low_velocity_detection() -> None:
             f"Standing end {standing_end} should be in reasonable range"
         )
     # May return None if standing detection is ambiguous - that's acceptable
-
-
-# WRAPPER FUNCTION TEST (1 test)
-
-
-def test_find_interpolated_takeoff_landing_wrapper_function() -> None:
-    """Test _find_interpolated_takeoff_landing wrapper combines takeoff and landing.
-
-    Wrapper combines takeoff + landing detection.
-
-    Biomechanical context: This wrapper function coordinates detection of both
-    takeoff and landing frames using physics-based methods specific to CMJ:
-    - Takeoff: peak upward velocity (end of push-off phase)
-    - Landing: impact acceleration (first ground contact after flight)
-
-    The wrapper handles all interpolation and acceleration computation internally.
-    """
-    # Arrange: Create realistic CMJ trajectory
-    positions = np.concatenate(
-        [
-            np.ones(20) * 1.0,  # Standing
-            np.linspace(1.0, 1.4, 35),  # Eccentric (down)
-            np.linspace(1.4, 0.5, 30),  # Concentric (up)
-            np.linspace(0.5, -0.2, 25),  # Flight (air)
-            np.linspace(-0.2, 1.0, 15),  # Landing
-        ]
-    )
-    velocities = compute_signed_velocity(positions, window_length=5, polyorder=2)
-    lowest_point_frame = 55  # Around where downward motion peaks
-
-    # Act: Use wrapper to find both takeoff and landing
-    result = _find_interpolated_takeoff_landing(
-        positions, velocities, lowest_point_frame, window_length=5, polyorder=2
-    )
-
-    # Assert: Both frames detected and in correct order
-    assert result is not None, "Wrapper should find both takeoff and landing"
-    takeoff, landing = result
-
-    # Verify return values are valid
-    assert isinstance(takeoff, float), "Takeoff should be float frame number"
-    assert isinstance(landing, float), "Landing should be float frame number"
-
-    # Verify temporal ordering
-    assert takeoff < landing, (
-        f"Takeoff {takeoff} must be before landing {landing} (time flows forward)"
-    )
-
-    # Verify frames are within reasonable bounds
-    assert 0 <= takeoff < len(positions), f"Takeoff {takeoff} outside array bounds"
-    assert 0 <= landing < len(positions), f"Landing {landing} outside array bounds"
-
-    # Verify takeoff and landing are separated (not same frame)
-    assert landing - takeoff > 2, (
-        f"Landing and takeoff too close ({landing - takeoff} frames apart)"
-    )
 
 
 # ============================================================================

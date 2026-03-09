@@ -10,7 +10,7 @@ from kinemotion.core.pose import MediaPipePoseTracker, PoseTrackerFactory
 from ..analysis_api import router as database_analysis_router
 from ..database import close_db_executor
 from ..logging_config import get_logger, setup_logging
-from ..routes import analysis_router, health_router, platform_router, ws_router
+from ..routes import analysis_router, health_router, platform_router
 from ..utils.rate_limiting import setup_rate_limiter
 
 # Initialize structured logging
@@ -84,7 +84,6 @@ def create_application() -> FastAPI:
     app.include_router(analysis_router)  # Main video analysis endpoints
     app.include_router(health_router)
     app.include_router(platform_router)
-    app.include_router(ws_router)  # WebSocket connections
 
     # Add exception handlers
     _add_exception_handlers(app)

@@ -54,12 +54,10 @@ jobs:
       - name: Run linting
         run: |
           uv run ruff check --output-format=github
-        continue-on-error: true  # Don't fail the build on linting errors
 
       - name: Run type checking
         run: |
           uv run pyright
-        continue-on-error: true  # Don't fail the build on type errors
 
       - name: Run tests with coverage
         run: |

@@ -4,7 +4,6 @@ from enum import Enum
 
 import numpy as np
 
-from ..core.experimental import unused
 from ..core.smoothing import (
     compute_acceleration_from_derivative,
     compute_velocity_from_derivative,
@@ -20,94 +19,6 @@ class ContactState(Enum):
     IN_AIR = "in_air"
     ON_GROUND = "on_ground"
     UNKNOWN = "unknown"
-
-
-@unused(
-    reason="Not called by analysis pipeline - awaiting CLI integration",
-    remove_in="1.0.0",
-    since="0.34.0",
-)
-def _calculate_adaptive_threshold(
-    positions: FloatArray,
-    fps: float,
-    baseline_duration: float = 3.0,
-    multiplier: float = 1.5,
-    smoothing_window: int = 5,
-    polyorder: int = 2,
-) -> float:
-    """
-    Calculate adaptive velocity threshold based on baseline motion characteristics.
-
-    .. warning::
-        **Status: Implemented but Not Integrated**
-
-        This function is fully implemented and tested but not called by the
-        analysis pipeline. See ``docs/development/errors-findings.md`` for details.
-
-        **To integrate**: Add CLI parameter ``--use-adaptive-threshold`` and
-        call this function before contact detection.
-
-        **Roadmap**: Planned for Phase 2 if users report issues with varying
-        video conditions.
-
-    Analyzes the first few seconds of video (assumed to be relatively stationary,
-    e.g., athlete standing on box) to determine the noise floor, then sets threshold
-    as a multiple of this baseline noise.
-
-    This adapts to:
-    - Different camera distances (closer = more pixel movement)
-    - Different lighting conditions (affects tracking quality)
-    - Different frame rates (higher fps = smoother motion)
-    - Video compression artifacts
-
-    Args:
-        positions: Array of vertical positions (0-1 normalized)
-        fps: Video frame rate
-        baseline_duration: Duration in seconds to analyze for baseline (default: 3.0s)
-        multiplier: Factor above baseline noise to set threshold (default: 1.5x)
-        smoothing_window: Window size for velocity computation
-        polyorder: Polynomial order for Savitzky-Golay filter (default: 2)
-
-    Returns:
-        Adaptive velocity threshold value
-
-    Example:
-        At 30fps with 3s baseline:
-        - Analyzes first 90 frames
-        - Computes velocity for this "stationary" period
-        - 95th percentile velocity = 0.012 (noise level)
-        - Threshold = 0.012 × 1.5 = 0.018
-    """
-    if len(positions) < 2:
-        return 0.02  # Fallback to default
-
-    # Calculate number of frames for baseline analysis
-    baseline_frames = int(fps * baseline_duration)
-    baseline_frames = min(baseline_frames, len(positions))
-
-    if baseline_frames < smoothing_window:
-        return 0.02  # Not enough data, use default
-
-    # Extract baseline period (assumed relatively stationary)
-    baseline_positions = positions[:baseline_frames]
-
-    # Compute velocity for baseline period using derivative
-    baseline_velocities = compute_velocity_from_derivative(
-        baseline_positions, window_length=smoothing_window, polyorder=polyorder
-    )
-
-    # Calculate noise floor as 95th percentile of baseline velocities
-    # Using 95th percentile instead of max to be robust against outliers
-    noise_floor = float(np.percentile(np.abs(baseline_velocities), 95))
-
-    # Set threshold as multiplier of noise floor
-    # Minimum threshold to avoid being too sensitive
-    adaptive_threshold = max(noise_floor * multiplier, 0.005)
-
-    # Maximum threshold to ensure we still detect contact
-    adaptive_threshold = min(adaptive_threshold, 0.05)
-
-    return adaptive_threshold
 
 
 def _find_stable_baseline(
@@ -948,39 +859,3 @@ def _calculate_average_visibility(
         if key in frame_landmarks and key in visibility_keys
     ]
     return float(np.mean(foot_vis)) if foot_vis else 0.0
-
-
-@unused(
-    reason="Alternative implementation not called by pipeline",
-    since="0.34.0",
-)
-def _extract_foot_positions_and_visibilities(
-    smoothed_landmarks: list[dict[str, tuple[float, float, float]] | None],
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Extract vertical positions and average visibilities from smoothed
-    landmarks.
-
-    This utility function eliminates code duplication between CLI and
-    programmatic usage.
-
-    Args:
-        smoothed_landmarks: Smoothed landmark sequence from tracking
-
-    Returns:
-        Tuple of (vertical_positions, visibilities) as numpy arrays
-    """
-    position_list: list[float] = []
-    visibilities_list: list[float] = []
-
-    for frame_landmarks in smoothed_landmarks:
-        if frame_landmarks:
-            _, foot_y = compute_average_foot_position(frame_landmarks)
-            position_list.append(foot_y)
-            visibilities_list.append(_calculate_average_visibility(frame_landmarks))
-        else:
-            # Fill missing frames with last known position or default
-            position_list.append(position_list[-1] if position_list else 0.5)
-            visibilities_list.append(0.0)
-
-    return np.array(position_list), np.array(visibilities_list)

@@ -8,7 +8,6 @@ import numpy as np
 
 from kinemotion.drop_jump.analysis import (
     ContactState,
-    _calculate_adaptive_threshold,
     _detect_drop_start,
     _find_interpolated_phase_transitions,
     _find_interpolated_phase_transitions_with_curvature,
@@ -320,42 +319,6 @@ class TestInterpolatedPhasesWithCurvature:
 
         # Should still detect phases without curvature
         assert len(phases_no_curvature) > 0
-
-
-class TestAdaptiveThreshold:
-    """Test adaptive velocity threshold calculation."""
-
-    def test_adaptive_threshold_with_low_noise(self) -> None:
-        """Test adaptive threshold with low-noise baseline."""
-        fps = 30.0
-        baseline_frames = int(3 * fps)
-
-        # Low noise baseline
-        rng = np.random.default_rng(42)
-        baseline_positions = 0.5 + rng.normal(0, 0.005, baseline_frames)
-        movement_positions = np.linspace(0.5, 0.7, 60)
-        positions = np.concatenate([baseline_positions, movement_positions])
-
-        threshold = _calculate_adaptive_threshold(positions, fps)
-
-        # Should have minimum threshold with low noise
-        assert 0.005 <= threshold <= 0.02
-
-    def test_adaptive_threshold_with_high_noise(self) -> None:
-        """Test adaptive threshold adapts to high-noise baseline."""
-        fps = 30.0
-        baseline_frames = int(3 * fps)
-
-        # High noise baseline
-        rng = np.random.default_rng(42)
-        baseline_positions = 0.5 + rng.normal(0, 0.015, baseline_frames)
-        movement_positions = np.linspace(0.5, 0.8, 60)
-        positions = np.concatenate([baseline_positions, movement_positions])
-
-        threshold = _calculate_adaptive_threshold(positions, fps)
-
-        # With higher noise, threshold should be proportionally higher
-        assert 0.010 <= threshold <= 0.05
 
 
 class TestPhaseOrdering:

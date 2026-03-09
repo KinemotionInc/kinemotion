@@ -1,7 +1,7 @@
 """Determinism utilities for reproducible analysis.
 
-Provides functions to set random seeds for NumPy, Python's random module,
-and TensorFlow (used by MediaPipe) to ensure deterministic behavior.
+Provides functions to set random seeds for NumPy and Python's random module
+to ensure deterministic behavior.
 """
 
 import hashlib
@@ -38,7 +38,6 @@ def set_deterministic_mode(seed: int | None = None, video_path: str | None = Non
     Sets seeds for:
     - Python's random module
     - NumPy random number generator
-    - TensorFlow (via environment variable for TFLite)
 
     Args:
         seed: Random seed value. If None and video_path provided,
@@ -61,23 +60,5 @@ def set_deterministic_mode(seed: int | None = None, video_path: str | None = Non
     # NumPy random
     np.random.seed(seed)
 
-    # TensorFlow/TFLite (used by MediaPipe)
-    # Set via environment variable before TF is initialized
+    # Set hash seed for deterministic hashing
     os.environ["PYTHONHASHSEED"] = str(seed)
-    os.environ["TF_DETERMINISTIC_OPS"] = "1"
-
-    # Try to set TensorFlow seed if available
-    try:
-        import tensorflow as tf
-
-        tf.random.set_seed(seed)
-
-        # Disable GPU non-determinism if CUDA is available
-        try:
-            tf.config.experimental.enable_op_determinism()
-        except AttributeError:
-            # Older TensorFlow versions don't have this
-            pass
-    except ImportError:
-        # TensorFlow not directly available (only via MediaPipe's bundled version)
-        pass

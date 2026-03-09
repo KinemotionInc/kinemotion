@@ -100,7 +100,7 @@ def test_analyze_default_quality_balanced(
     """Test that default quality preset is 'balanced'."""
     files = {"file": ("test.mp4", BytesIO(sample_video_bytes), "video/mp4")}
 
-    cmj_patch = "kinemotion_backend.services.video_processor.process_cmj_video"
+    cmj_patch = "kinemotion_backend.services.analysis_service.process_cmj_video"
     with patch(cmj_patch) as mock_cmj:
         # Set up mock to return proper response
         class MockResult:
@@ -124,7 +124,7 @@ def test_analyze_custom_quality_fast(
     """Test that custom quality preset is respected."""
     files = {"file": ("test.mp4", BytesIO(sample_video_bytes), "video/mp4")}
 
-    cmj_patch = "kinemotion_backend.services.video_processor.process_cmj_video"
+    cmj_patch = "kinemotion_backend.services.analysis_service.process_cmj_video"
     with patch(cmj_patch) as mock_cmj:
 
         class MockResult:
@@ -150,7 +150,7 @@ def test_analyze_custom_quality_accurate(
     """Test that accurate quality preset works."""
     files = {"file": ("test.mp4", BytesIO(sample_video_bytes), "video/mp4")}
 
-    cmj_patch = "kinemotion_backend.services.video_processor.process_cmj_video"
+    cmj_patch = "kinemotion_backend.services.analysis_service.process_cmj_video"
     with patch(cmj_patch) as mock_cmj:
 
         class MockResult:
@@ -285,7 +285,7 @@ def test_analyze_default_jump_type_cmj(
     """Test that default jump type is CMJ."""
     files = {"file": ("test.mp4", BytesIO(sample_video_bytes), "video/mp4")}
 
-    cmj_patch = "kinemotion_backend.services.video_processor.process_cmj_video"
+    cmj_patch = "kinemotion_backend.services.analysis_service.process_cmj_video"
     with patch(cmj_patch) as mock_cmj:
 
         class MockResult:

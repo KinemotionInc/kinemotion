@@ -1,6 +1,7 @@
 """Shared debug overlay utilities for video rendering."""
 
 # pyright: reportCallIssue=false
+import logging
 import os
 import shutil
 import subprocess
@@ -36,30 +37,16 @@ from .overlay_constants import (
 )
 from .timing import NULL_TIMER, Timer
 
-# Setup logging with structlog support for backend, fallback to standard logging for CLI
-try:
-    import structlog
-
-    logger = structlog.get_logger(__name__)
-    _using_structlog = True
-except ImportError:
-    import logging
-
-    logger = logging.getLogger(__name__)
-    _using_structlog = False
+logger = logging.getLogger(__name__)
 
 
 def _log(level: str, message: str, **kwargs: object) -> None:
-    """Log message with kwargs support for both structlog and standard logging."""
-    if _using_structlog:
-        getattr(logger, level)(message, **kwargs)
+    """Log message with optional key-value context."""
+    if kwargs:
+        kwargs_str = " ".join(f"{k}={v}" for k, v in kwargs.items())
+        getattr(logger, level)(f"{message} {kwargs_str}")
     else:
-        # For standard logging, format kwargs as part of the message
-        if kwargs:
-            kwargs_str = " ".join(f"{k}={v}" for k, v in kwargs.items())
-            getattr(logger, level)(f"{message} {kwargs_str}")
-        else:
-            getattr(logger, level)(message)
+        getattr(logger, level)(message)
 
 
 def create_video_writer(
