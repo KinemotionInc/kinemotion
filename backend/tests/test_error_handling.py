@@ -177,7 +177,7 @@ def test_value_error_during_processing_returns_422(
     """Test that ValueError during processing returns 422."""
     files = {"file": ("test.mp4", BytesIO(sample_video_bytes), "video/mp4")}
 
-    cmj_patch = "kinemotion_backend.services.video_processor.process_cmj_video"
+    cmj_patch = "kinemotion_backend.services.analysis_service.process_cmj_video"
     with patch(cmj_patch) as mock_cmj:
         mock_cmj.side_effect = ValueError("Invalid video content")
         response = client.post("/api/analyze", files=files, data={"jump_type": "cmj"})
@@ -213,7 +213,7 @@ def test_keyboard_interrupt_returns_500(
     files = {"file": ("test.mp4", BytesIO(sample_video_bytes), "video/mp4")}
 
     try:
-        cmj_patch = "kinemotion_backend.services.video_processor.process_cmj_video"
+        cmj_patch = "kinemotion_backend.services.analysis_service.process_cmj_video"
         with patch(cmj_patch) as mock_cmj:
             mock_cmj.side_effect = KeyboardInterrupt()
             response = client.post("/api/analyze", files=files, data={"jump_type": "cmj"})
@@ -232,7 +232,7 @@ def test_processing_time_recorded_on_error(
     """Test that processing_time_s is recorded even on error."""
     files = {"file": ("test.mp4", BytesIO(sample_video_bytes), "video/mp4")}
 
-    cmj_patch = "kinemotion_backend.services.video_processor.process_cmj_video"
+    cmj_patch = "kinemotion_backend.services.analysis_service.process_cmj_video"
     with patch(cmj_patch) as mock_cmj:
         mock_cmj.side_effect = RuntimeError("Error")
         response = client.post("/api/analyze", files=files, data={"jump_type": "cmj"})
@@ -249,7 +249,7 @@ def test_error_messages_not_empty(
     """Test that error messages are not empty."""
     files = {"file": ("test.mp4", BytesIO(sample_video_bytes), "video/mp4")}
 
-    cmj_patch = "kinemotion_backend.services.video_processor.process_cmj_video"
+    cmj_patch = "kinemotion_backend.services.analysis_service.process_cmj_video"
     with patch(cmj_patch) as mock_cmj:
         mock_cmj.side_effect = RuntimeError("Processing failed")
         response = client.post("/api/analyze", files=files, data={"jump_type": "cmj"})
@@ -266,7 +266,7 @@ def test_no_metrics_in_error_response(
     """Test that error responses don't include metrics."""
     files = {"file": ("test.mp4", BytesIO(sample_video_bytes), "video/mp4")}
 
-    cmj_patch = "kinemotion_backend.services.video_processor.process_cmj_video"
+    cmj_patch = "kinemotion_backend.services.analysis_service.process_cmj_video"
     with patch(cmj_patch) as mock_cmj:
         mock_cmj.side_effect = RuntimeError("Error")
         response = client.post("/api/analyze", files=files, data={"jump_type": "cmj"})

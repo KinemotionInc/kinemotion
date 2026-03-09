@@ -6,12 +6,15 @@ import uuid
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import UploadFile
 
 if TYPE_CHECKING:
     from kinemotion.core.demographics import AthleteDemographics
+
+from kinemotion import process_cmj_video, process_dropjump_video, process_sj_video
+from kinemotion.core.timing import Timer
 
 from ..logging_config import get_logger
 from ..models.responses import AnalysisResponse, MetricsData
@@ -19,7 +22,6 @@ from ..models.storage import VIDEO_KEY_PREFIX
 from .interpretation_service import interpret_metrics
 from .storage_service import StorageService
 from .validation import validate_jump_type, validate_video_file
-from .video_processor import VideoProcessorService
 
 logger = get_logger(__name__)
 
@@ -86,7 +88,65 @@ class AnalysisService:
     def __init__(self) -> None:
         """Initialize analysis service with required dependencies."""
         self.storage_service = StorageService()
-        self.video_processor = VideoProcessorService()
+
+    @staticmethod
+    def _dispatch_analysis(
+        video_path: str,
+        jump_type: str,
+        quality: str = "balanced",
+        output_video: str | None = None,
+        timer: Timer | None = None,
+        pose_tracker: object | None = None,
+        demographics: AthleteDemographics | None = None,
+    ) -> dict[str, Any]:
+        """Dispatch video analysis to the appropriate jump-type processor.
+
+        Args:
+            video_path: Path to video file
+            jump_type: Canonical jump type ("cmj", "drop_jump", "sj")
+            quality: Analysis quality preset
+            output_video: Optional path for debug video output
+            timer: Optional Timer for measuring operations
+            pose_tracker: Optional shared tracker instance
+            demographics: Optional athlete demographics for validation
+
+        Returns:
+            Dictionary with metrics
+
+        Raises:
+            ValueError: If jump type is unsupported
+        """
+        if jump_type == "drop_jump":
+            result = process_dropjump_video(
+                video_path,
+                quality=quality,
+                output_video=output_video,
+                timer=timer,
+                pose_tracker=pose_tracker,  # type: ignore[arg-type]
+                demographics=demographics,
+            )
+        elif jump_type == "cmj":
+            result = process_cmj_video(
+                video_path,
+                quality=quality,
+                output_video=output_video,
+                timer=timer,
+                pose_tracker=pose_tracker,  # type: ignore[arg-type]
+                demographics=demographics,
+            )
+        elif jump_type == "sj":
+            result = process_sj_video(
+                video_path,
+                quality=quality,
+                output_video=output_video,
+                timer=timer,
+                pose_tracker=pose_tracker,  # type: ignore[arg-type]
+                demographics=demographics,
+            )
+        else:
+            raise ValueError(f"Unsupported jump type: {jump_type}")
+
+        return cast(dict[str, Any], result.to_dict())
 
     async def analyze_video(
         self,
@@ -246,7 +306,7 @@ class AnalysisService:
                 logger.info("video_processing_started")
                 timer = PerformanceTimer()
                 with timer.measure("video_processing"):
-                    metrics = await self.video_processor.process_video_async(
+                    metrics = self._dispatch_analysis(
                         video_path=temp_path,
                         jump_type=normalized_jump_type,
                         quality=quality,
@@ -380,7 +440,7 @@ class AnalysisService:
         logger.info("video_processing_started")
         timer = timer_class()
         with timer.measure("video_processing"):
-            metrics = await self.video_processor.process_video_async(
+            metrics = self._dispatch_analysis(
                 video_path=temp_path,
                 jump_type=normalized_jump_type,
                 quality=quality,

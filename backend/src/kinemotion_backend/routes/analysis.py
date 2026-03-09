@@ -24,7 +24,6 @@ from ..models.storage import PRESIGN_UPLOAD_EXPIRATION_S, VIDEO_KEY_PREFIX
 from ..services import is_test_password_valid, validate_demographics, validate_referer
 from ..services.analysis_service import AnalysisService
 from ..services.storage_service import StorageService
-from ..utils import limit
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api", tags=["Analysis"])
@@ -76,9 +75,8 @@ async def get_user_email_for_analysis(
 
 
 @router.post("/upload/presign")
-@limit("5/minute")
 async def presign_upload(
-    request: Request,  # required by slowapi @limit decorator
+    request: Request,
     filename: str = Form(...),  # noqa: B008
     content_type: str = Form(...),  # noqa: B008
     email: str = Depends(get_user_email_for_analysis),  # noqa: B008
@@ -143,7 +141,6 @@ async def presign_upload(
         500: {"model": AnalysisResponse, "description": "Internal server error"},
     },
 )
-@limit("3/minute")
 async def analyze_video(
     request: Request,
     file: UploadFile | None = File(None),  # noqa: B008

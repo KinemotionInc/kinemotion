@@ -662,7 +662,7 @@ async def test_analyze_from_r2_key_success(
         def to_dict(self) -> dict[str, Any]:
             return sample_cmj_metrics
 
-    with patch("kinemotion_backend.services.video_processor.process_cmj_video") as mock_cmj:
+    with patch("kinemotion_backend.services.analysis_service.process_cmj_video") as mock_cmj:
         mock_cmj.return_value = MockCMJResult()
 
         result = await service.analyze_from_r2_key(

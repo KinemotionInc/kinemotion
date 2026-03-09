@@ -6,8 +6,7 @@ for testing or when fastapi-limiter is unavailable.
 """
 
 import os
-from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -17,8 +16,6 @@ from ..logging_config import get_logger
 from .rate_limiter import NoOpLimiter
 
 logger = get_logger(__name__)
-
-F = TypeVar("F", bound=Callable[..., object])
 
 
 # Rate limiter instance - set during initialization
@@ -70,49 +67,3 @@ def setup_rate_limiter(app: Any) -> Limiter | NoOpLimiter:
     _rate_limiter = limiter
     logger.info("rate_limiter_initialized", type="slowapi")
     return _rate_limiter
-
-
-def limit(limit_string: str) -> Callable[[F], F]:
-    """Rate limit decorator for endpoints.
-
-    This decorator is lazy and will get the rate limiter when the endpoint
-    is called, not at import time. This allows it to be used at module level
-    before setup_rate_limiter() has been called.
-
-    Args:
-        limit_string: Rate limit string (e.g., "3/minute", "100/hour")
-
-    Returns:
-        Decorator function
-
-    Example:
-        @router.post("/api/analyze")
-        @limit("3/minute")
-        async def analyze_video(...):
-            ...
-    """
-
-    def decorator(func: F) -> F:
-        """Decorator that applies rate limiting to the function.
-
-        Args:
-            func: Function to decorate
-
-        Returns:
-            Decorated function (or original if limiter not available)
-        """
-        # Try to get the limiter - if not initialized, return function as-is
-        try:
-            limiter_instance = get_rate_limiter()
-        except RuntimeError:
-            # Limiter not set up yet (e.g., during import)
-            # Return the function unchanged - this is OK for testing
-            return func
-
-        # Apply the rate limit from the limiter
-        if hasattr(limiter_instance, "limit"):
-            return limiter_instance.limit(limit_string)(func)
-        # For NoOpLimiter, just return the function
-        return func
-
-    return decorator

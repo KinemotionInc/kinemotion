@@ -96,8 +96,8 @@ def mock_kinemotion_analysis(
     # Don't mock storage service when no_kinemotion_mock is requested
     if "no_kinemotion_mock" in request.fixturenames:
         # Only mock kinemotion processing, not storage
-        cmj_patch = "kinemotion_backend.services.video_processor.process_cmj_video"
-        dj_patch = "kinemotion_backend.services.video_processor.process_dropjump_video"
+        cmj_patch = "kinemotion_backend.services.analysis_service.process_cmj_video"
+        dj_patch = "kinemotion_backend.services.analysis_service.process_dropjump_video"
         with patch(cmj_patch) as mock_cmj, patch(dj_patch) as mock_dropjump:
             mock_cmj.return_value = MockCMJResult()
             mock_dropjump.return_value = MockDropJumpResult()
@@ -105,8 +105,8 @@ def mock_kinemotion_analysis(
             yield {"cmj": mock_cmj, "dropjump": mock_dropjump}
     else:
         # Mock both kinemotion processing and storage service (normal case)
-        cmj_patch = "kinemotion_backend.services.video_processor.process_cmj_video"
-        dj_patch = "kinemotion_backend.services.video_processor.process_dropjump_video"
+        cmj_patch = "kinemotion_backend.services.analysis_service.process_cmj_video"
+        dj_patch = "kinemotion_backend.services.analysis_service.process_dropjump_video"
         upload_video_patch = (
             "kinemotion_backend.services.storage_service.StorageService.upload_video"
         )
